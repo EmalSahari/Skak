@@ -10,6 +10,7 @@ import type {
   ServerToClientEvents,
 } from '@skak/shared';
 import { RoomManager, type Account, type Room } from './rooms.js';
+import { Matchmaker } from './matchmaking.js';
 import {
   createUser,
   dbEnabled,
@@ -116,20 +117,37 @@ function broadcast(room: Room) {
 
 const manager = new RoomManager(broadcast);
 
+/** Maps each connected socket to the room/player it is currently controlling. */
+const sessions = new Map<string, { roomId: string; playerId: string }>();
+
+const matchmaker = new Matchmaker(
+  io,
+  manager,
+  (socketId, roomId, playerId) => {
+    sessions.set(socketId, { roomId, playerId });
+    manager.bindSocket(roomId, playerId, socketId);
+  },
+  broadcast,
+);
+
 io.on('connection', (socket) => {
-  let myRoomId: string | null = null;
-  let myPlayerId: string | null = null;
+  const session = () => sessions.get(socket.id);
 
   const enter = (roomId: string, playerId: string) => {
-    myRoomId = roomId;
-    myPlayerId = playerId;
+    sessions.set(socket.id, { roomId, playerId });
     socket.join(roomId);
     manager.bindSocket(roomId, playerId, socket.id);
   };
 
   socket.on('room:create', async (req, cb) => {
     const account = await resolveAccount(req.authToken);
-    const { room, player } = manager.create(req.mode, req.name, req.timeControl ?? null, account);
+    const { room, player } = manager.create(
+      req.mode,
+      req.name,
+      req.timeControl ?? null,
+      account,
+      req.rated ?? true,
+    );
     enter(room.id, player.id);
     cb({ ok: true, roomId: room.id, playerId: player.id, token: player.token });
     broadcast(room);
@@ -159,8 +177,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('room:start', (req, cb) => {
-    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
-    const result = manager.start(req.roomId, myPlayerId);
+    const s = session();
+    if (!s) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.start(req.roomId, s.playerId);
     if (result.error) return cb({ ok: false, error: result.error });
     cb({ ok: true });
     const room = manager.get(req.roomId);
@@ -168,8 +187,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('game:move', (req, cb) => {
-    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
-    const result = manager.move(req.roomId, myPlayerId, req.move);
+    const s = session();
+    if (!s) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.move(req.roomId, s.playerId, req.move);
     if (result.error) return cb({ ok: false, error: result.error });
     cb({ ok: true });
     const room = manager.get(req.roomId);
@@ -177,8 +197,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('game:resign', (req, cb) => {
-    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
-    const result = manager.resign(req.roomId, myPlayerId);
+    const s = session();
+    if (!s) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.resign(req.roomId, s.playerId);
     if (result.error) return cb({ ok: false, error: result.error });
     cb({ ok: true });
     const room = manager.get(req.roomId);
@@ -186,8 +207,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('game:draw-offer', (req, cb) => {
-    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
-    const result = manager.offerDraw(req.roomId, myPlayerId);
+    const s = session();
+    if (!s) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.offerDraw(req.roomId, s.playerId);
     if (result.error) return cb({ ok: false, error: result.error });
     cb({ ok: true });
     const room = manager.get(req.roomId);
@@ -195,8 +217,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('game:draw-respond', (req, cb) => {
-    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
-    const result = manager.respondDraw(req.roomId, myPlayerId, req.accept);
+    const s = session();
+    if (!s) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.respondDraw(req.roomId, s.playerId, req.accept);
     if (result.error) return cb({ ok: false, error: result.error });
     cb({ ok: true });
     const room = manager.get(req.roomId);
@@ -204,8 +227,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('room:rematch', (req, cb) => {
-    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
-    const result = manager.rematch(req.roomId, myPlayerId);
+    const s = session();
+    if (!s) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.rematch(req.roomId, s.playerId);
     if (result.error) return cb({ ok: false, error: result.error });
     cb({ ok: true });
     const room = manager.get(req.roomId);
@@ -213,16 +237,36 @@ io.on('connection', (socket) => {
   });
 
   socket.on('room:chat', (req) => {
-    if (!myPlayerId) return;
-    const msg = manager.chat(req.roomId, myPlayerId, req.text);
+    const s = session();
+    if (!s) return;
+    const msg = manager.chat(req.roomId, s.playerId, req.text);
     if (msg) io.to(req.roomId).emit('room:chat', msg);
   });
 
   socket.on('room:leave', () => {
-    if (myRoomId) socket.leave(myRoomId);
+    const s = session();
+    if (s) socket.leave(s.roomId);
+    matchmaker.cancel(socket.id);
+  });
+
+  socket.on('mm:join', async (req, cb) => {
+    const account = await resolveAccount(req.authToken);
+    matchmaker.join(socket.id, {
+      name: account?.username ?? req.name,
+      account,
+      mode: req.mode,
+      tc: req.timeControl ?? null,
+    });
+    cb({ ok: true });
+  });
+
+  socket.on('mm:cancel', () => {
+    matchmaker.cancel(socket.id);
   });
 
   socket.on('disconnect', () => {
+    matchmaker.cancel(socket.id);
+    sessions.delete(socket.id);
     const room = manager.disconnect(socket.id);
     if (room) broadcast(room);
   });

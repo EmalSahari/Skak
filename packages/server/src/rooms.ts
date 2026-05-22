@@ -51,6 +51,7 @@ export interface Room {
   clockTimer: NodeJS.Timeout | null;
   drawOffer: Color | null;
   recorded: boolean;
+  rated: boolean;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -75,6 +76,7 @@ export class RoomManager {
     name: string,
     timeControl: TimeControl | null,
     account: Account | null,
+    rated = true,
   ): { room: Room; player: Player } {
     const id = makeCode(new Set(this.rooms.keys()));
     const player = this.newPlayer(name, account);
@@ -95,10 +97,28 @@ export class RoomManager {
       clockTimer: null,
       drawOffer: null,
       recorded: false,
+      rated,
     };
     this.assignColors(room);
     this.rooms.set(id, room);
     return { room, player };
+  }
+
+  /** Create a fully-seated room from matched players and auto-start it. */
+  createMatch(
+    mode: GameMode,
+    timeControl: TimeControl | null,
+    rated: boolean,
+    participants: { name: string; account: Account | null }[],
+  ): { room: Room; creds: { playerId: string; token: string }[] } {
+    const [first, ...rest] = participants;
+    const { room, player } = this.create(mode, first.name, timeControl, first.account, rated);
+    const creds = [{ playerId: player.id, token: player.token }];
+    for (const p of rest) {
+      const r = this.join(room.id, p.name, p.account);
+      if (!('error' in r)) creds.push({ playerId: r.player.id, token: r.player.token });
+    }
+    return { room, creds };
   }
 
   get(id: string): Room | undefined {
@@ -259,6 +279,7 @@ export class RoomManager {
   private recordResult(room: Room) {
     if (!room.engine || !room.engine.result.over || room.recorded) return;
     room.recorded = true;
+    if (!room.rated) return;
     const { winner } = room.engine.result;
     const humans = [...room.players.values()].filter((p) => p.userId != null && p.color);
     if (room.mode === '2p') {

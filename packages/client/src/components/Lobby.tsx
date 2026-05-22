@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Bot, LogIn, Sparkles, Users } from 'lucide-react';
+import { ArrowRight, Bot, LogIn, Shuffle, Sparkles, Users } from 'lucide-react';
 import type { Difficulty, GameMode, TimeControl } from '@skak/shared';
 import { COLOR_HEX, MODE_COLORS } from '@skak/shared';
 import { Button } from './ui/Button.js';
@@ -31,18 +31,20 @@ function hashCode(): string {
 }
 
 interface Props {
-  onCreate: (mode: GameMode, name: string, tc: TimeControl | null) => void;
+  onCreate: (mode: GameMode, name: string, tc: TimeControl | null, rated: boolean) => void;
   onJoin: (roomId: string, name: string) => void;
   onSolo: (mode: GameMode, name: string, difficulty: Difficulty, tc: TimeControl | null) => void;
+  onFindMatch: (mode: GameMode, name: string, tc: TimeControl | null) => void;
 }
 
-export function Lobby({ onCreate, onJoin, onSolo }: Props) {
+export function Lobby({ onCreate, onJoin, onSolo, onFindMatch }: Props) {
   const [name, setName] = useState(() => localStorage.getItem('skak.name') ?? '');
   const [mode, setMode] = useState<GameMode>('2p');
   const [code, setCode] = useState(hashCode);
   const [opponent, setOpponent] = useState<'online' | 'cpu'>('online');
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const [tcIndex, setTcIndex] = useState(0);
+  const [rated, setRated] = useState(true);
   const tc = TIME_CONTROLS[tcIndex].value;
 
   const remember = (n: string) => {
@@ -193,11 +195,42 @@ export function Lobby({ onCreate, onJoin, onSolo }: Props) {
           </>
         ) : (
           <>
-            <Button className="w-full py-3" onClick={() => onCreate(mode, name, tc)}>
-              Create {mode.toUpperCase()} game <ArrowRight className="h-4 w-4" />
+            <span className="mb-2 block text-xs font-medium text-zinc-400">Scoring</span>
+            <div className="mb-5 grid grid-cols-2 gap-2">
+              {[
+                { v: true, label: 'Ranked' },
+                { v: false, label: 'Casual' },
+              ].map(({ v, label }) => (
+                <button
+                  key={label}
+                  onClick={() => setRated(v)}
+                  className={cn(
+                    'rounded-xl border py-2.5 text-sm font-medium transition',
+                    rated === v
+                      ? 'border-brand-500/70 bg-brand-500/10 text-white'
+                      : 'border-white/10 bg-white/[0.02] text-zinc-400 hover:text-zinc-200',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <Button className="w-full py-3" onClick={() => onFindMatch(mode, name, tc)}>
+              <Shuffle className="h-4 w-4" /> Play a stranger
             </Button>
 
-            <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
+            <div className="my-4 flex items-center gap-3 text-xs text-zinc-500">
+              <span className="h-px flex-1 bg-white/10" />
+              or
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+
+            <Button variant="subtle" className="w-full py-3" onClick={() => onCreate(mode, name, tc, rated)}>
+              Create private game <ArrowRight className="h-4 w-4" />
+            </Button>
+
+            <div className="my-4 flex items-center gap-3 text-xs text-zinc-500">
               <span className="h-px flex-1 bg-white/10" />
               or join with a code
               <span className="h-px flex-1 bg-white/10" />

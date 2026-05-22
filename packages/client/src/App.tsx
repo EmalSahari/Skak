@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, Crown, LogOut, Trophy, Wifi, WifiOff } from 'lucide-react';
-import type { ChatMessage, Difficulty, GameMode, Move, RoomSync, TimeControl } from '@skak/shared';
+import type {
+  ChatMessage,
+  Difficulty,
+  GameMode,
+  MatchStatus,
+  Move,
+  RoomSync,
+  TimeControl,
+} from '@skak/shared';
 import { socket } from './socket.js';
 import { Lobby } from './components/Lobby.js';
 import { GameRoom } from './components/GameRoom.js';
 import { AuthModal } from './components/AuthModal.js';
 import { Leaderboard } from './components/Leaderboard.js';
+import { ProfileModal } from './components/ProfileModal.js';
+import { SearchingOverlay } from './components/SearchingOverlay.js';
 import { useLocalGame } from './useLocalGame.js';
 import { useAuth } from './useAuth.js';
 import { flagEmoji } from './lib/countries.js';
@@ -44,6 +54,9 @@ export function App() {
   authTokenRef.current = auth.token;
   const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
   const [showBoard, setShowBoard] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [searching, setSearching] = useState<GameMode | null>(null);
+  const [matchStatus, setMatchStatus] = useState<MatchStatus | null>(null);
 
   const saveSession = useCallback((s: Session | null) => {
     setSession(s);
@@ -71,12 +84,21 @@ export function App() {
       setTimeout(() => setError(null), 4000);
     };
     const onChat = (msg: ChatMessage) => setChat((c) => [...c.slice(-99), msg]);
+    const onMatchStatus = (s: MatchStatus) => setMatchStatus(s);
+    const onMatchFound = (f: { roomId: string; playerId: string; token: string }) => {
+      saveSession({ roomId: f.roomId, playerId: f.playerId, token: f.token });
+      setSearching(null);
+      setMatchStatus(null);
+      setChat([]);
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room:state', onState);
     socket.on('room:error', onError);
     socket.on('room:chat', onChat);
+    socket.on('mm:status', onMatchStatus);
+    socket.on('mm:found', onMatchFound);
     if (socket.connected) onConnect();
 
     return () => {
@@ -85,20 +107,47 @@ export function App() {
       socket.off('room:state', onState);
       socket.off('room:error', onError);
       socket.off('room:chat', onChat);
+      socket.off('mm:status', onMatchStatus);
+      socket.off('mm:found', onMatchFound);
     };
   }, [saveSession]);
 
   const createRoom = useCallback(
-    (mode: GameMode, name: string, timeControl: TimeControl | null) => {
-      socket.emit('room:create', { mode, name, timeControl, authToken: authTokenRef.current ?? undefined }, (res) => {
-        if (res.ok && res.roomId && res.playerId && res.token) {
-          saveSession({ roomId: res.roomId, playerId: res.playerId, token: res.token });
-          setChat([]);
-        } else setError(res.error ?? 'Could not create room');
-      });
+    (mode: GameMode, name: string, timeControl: TimeControl | null, rated: boolean) => {
+      socket.emit(
+        'room:create',
+        { mode, name, timeControl, rated, authToken: authTokenRef.current ?? undefined },
+        (res) => {
+          if (res.ok && res.roomId && res.playerId && res.token) {
+            saveSession({ roomId: res.roomId, playerId: res.playerId, token: res.token });
+            setChat([]);
+          } else setError(res.error ?? 'Could not create room');
+        },
+      );
     },
     [saveSession],
   );
+
+  const findMatch = useCallback((mode: GameMode, name: string, timeControl: TimeControl | null) => {
+    setSearching(mode);
+    setMatchStatus(null);
+    socket.emit(
+      'mm:join',
+      { mode, name, timeControl, authToken: authTokenRef.current ?? undefined },
+      (res) => {
+        if (!res.ok) {
+          setError(res.error ?? 'Could not join matchmaking');
+          setSearching(null);
+        }
+      },
+    );
+  }, []);
+
+  const cancelMatch = useCallback(() => {
+    socket.emit('mm:cancel');
+    setSearching(null);
+    setMatchStatus(null);
+  }, []);
 
   const joinRoom = useCallback(
     (roomId: string, name: string) => {
@@ -186,7 +235,7 @@ export function App() {
     <div className="flex min-h-full flex-col">
       <div className="aurora" />
 
-      <header className="flex items-center justify-between border-b border-white/5 px-4 py-3 sm:px-6">
+      <header className="safe-top flex items-center justify-between border-b border-white/5 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-blue-600 shadow-lg shadow-brand-600/30">
             <Crown className="h-5 w-5 text-white" />
@@ -206,10 +255,16 @@ export function App() {
           </button>
 
           {auth.user ? (
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1 pl-3 pr-1 text-xs">
-              <span>{flagEmoji(auth.user.country)}</span>
-              <span className="font-semibold">{auth.user.username}</span>
-              <span className="font-mono text-brand-300">{auth.user.elo}</span>
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-1 text-xs">
+              <button
+                onClick={() => setShowProfile(true)}
+                title="View profile"
+                className="flex items-center gap-2 rounded-full px-2 py-0.5 hover:bg-white/10"
+              >
+                <span>{flagEmoji(auth.user.country)}</span>
+                <span className="font-semibold">{auth.user.username}</span>
+                <span className="font-mono text-brand-300">{auth.user.elo}</span>
+              </button>
               <button
                 onClick={auth.logout}
                 title="Log out"
@@ -286,7 +341,16 @@ export function App() {
           onRematch={requestRematch}
         />
       ) : (
-        <Lobby onCreate={createRoom} onJoin={joinRoom} onSolo={startSolo} />
+        <Lobby
+          onCreate={createRoom}
+          onJoin={joinRoom}
+          onSolo={startSolo}
+          onFindMatch={findMatch}
+        />
+      )}
+
+      {searching && (
+        <SearchingOverlay mode={searching} status={matchStatus} onCancel={cancelMatch} />
       )}
 
       <AnimatePresence>
@@ -299,6 +363,9 @@ export function App() {
           />
         )}
         {showBoard && <Leaderboard onClose={() => setShowBoard(false)} />}
+        {showProfile && auth.user && (
+          <ProfileModal user={auth.user} onClose={() => setShowProfile(false)} />
+        )}
       </AnimatePresence>
     </div>
   );

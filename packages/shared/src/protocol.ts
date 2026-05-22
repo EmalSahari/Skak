@@ -94,6 +94,7 @@ export interface CreateRoomReq {
   name: string;
   timeControl?: TimeControl | null;
   authToken?: string;
+  rated?: boolean;
 }
 export interface CreateRoomRes {
   ok: boolean;
@@ -125,10 +126,31 @@ export interface MoveRes {
   error?: string;
 }
 
+export interface MatchmakeReq {
+  mode: GameMode;
+  name: string;
+  timeControl?: TimeControl | null;
+  rated?: boolean;
+  authToken?: string;
+}
+
+export interface MatchStatus {
+  waiting: number;
+  estimateSec: number;
+}
+
+export interface MatchFound {
+  roomId: string;
+  playerId: string;
+  token: string;
+}
+
 export interface ServerToClientEvents {
   'room:state': (sync: RoomSync) => void;
   'room:error': (message: string) => void;
   'room:chat': (message: ChatMessage) => void;
+  'mm:status': (status: MatchStatus) => void;
+  'mm:found': (found: MatchFound) => void;
 }
 
 export interface ClientToServerEvents {
@@ -143,4 +165,6 @@ export interface ClientToServerEvents {
   'game:draw-offer': (req: { roomId: string }, cb: (res: MoveRes) => void) => void;
   'game:draw-respond': (req: { roomId: string; accept: boolean }, cb: (res: MoveRes) => void) => void;
   'room:chat': (req: { roomId: string; text: string }) => void;
+  'mm:join': (req: MatchmakeReq, cb: (res: MoveRes) => void) => void;
+  'mm:cancel': () => void;
 }
