@@ -2,13 +2,17 @@ import type { CSSProperties } from 'react';
 import type { Color, PieceType } from '@skak/shared';
 import { COLOR_HEX } from '@skak/shared';
 
+// U+FE0E (text variation selector) forces text rendering. Without it, iOS
+// renders some glyphs — notably the pawn ♟ — as a fixed-color emoji that
+// ignores the CSS color, making every army's pawns look identical.
+const VS = '︎';
 const GLYPH: Record<PieceType, string> = {
-  k: '♚',
-  q: '♛',
-  r: '♜',
-  b: '♝',
-  n: '♞',
-  p: '♟',
+  k: '♚' + VS,
+  q: '♛' + VS,
+  r: '♜' + VS,
+  b: '♝' + VS,
+  n: '♞' + VS,
+  p: '♟' + VS,
 };
 
 /** Dark armies get a light outline; light armies get a dark outline. */
