@@ -1,0 +1,54 @@
+# Skak — Online Chess for 2, 3 & 4 Players
+
+Real-time multiplayer chess. Create a room, share the 4-letter code, and play
+classic 2-player chess or free-for-all games with 3 or 4 armies.
+
+## Features
+
+- **2-player** — full standard chess: legal-move validation, check, checkmate,
+  stalemate, castling, en passant, and pawn promotion (with under-promotion).
+- **3-player** & **4-player** — free-for-all on the cross board. When a player is
+  checkmated they are eliminated and their pieces leave the board; the last
+  army standing wins.
+- **Real-time rooms** over WebSockets (Socket.IO) with auto-start when full,
+  reconnect-on-refresh, a player list, turn/check indicators, and room chat.
+
+## Project layout
+
+This is an npm-workspaces monorepo:
+
+| Package           | What it is                                                        |
+| ----------------- | ----------------------------------------------------------------- |
+| `packages/shared` | Game model, the chess engine (rules for every mode), and the network protocol. Shared by both client and server. |
+| `packages/server` | Express + Socket.IO server. Authoritative room & game state.      |
+| `packages/client` | React + TypeScript + Vite web app.                                |
+
+The server is authoritative: it validates every move with the same engine the
+client uses to preview legal moves, then broadcasts the new board to the room.
+
+## Getting started
+
+```bash
+npm install        # install all workspaces
+npm run dev         # runs the server (:3001) and the client (:5173) together
+```
+
+Open http://localhost:5173, create a game, and open the same URL (or the copied
+room link) in another tab/device to join. A 2-player game starts automatically
+once 2 players join; 3- and 4-player games start when their seats are full.
+
+Set `VITE_SERVER_URL` for the client if the server is not on `host:3001`.
+
+## Other commands
+
+```bash
+npm test            # run the chess-engine test suite
+npm run build       # production build of every package
+```
+
+## Notes on the 3- and 4-player rules
+
+The 3- and 4-player modes use a 14×14 cross board (the four 3×3 corners are
+removed). 4-player seats all four armies; 3-player uses three and leaves the
+fourth arm open. These are simplified, self-consistent free-for-all rulesets —
+a dedicated hexagonal 3-player board could be added later.

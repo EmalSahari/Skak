@@ -1,0 +1,19 @@
+{
+  "name": "skak",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Online chess for 2, 3, and 4 players",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w @skak/server\" \"npm run dev -w @skak/client\"",
+    "build": "npm run build -w @skak/shared && npm run build -w @skak/client && npm run build -w @skak/server",
+    "test": "npm run test -w @skak/shared"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
