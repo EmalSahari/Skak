@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: skak
+    runtime: node
+    plan: free
+    branch: claude/multiplayer-chess-app-T8BQF
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
