@@ -52,6 +52,26 @@ export interface Leaderboard {
   wins: WinsEntry[];
 }
 
+export interface ReviewReq {
+  mode: GameMode;
+  result: string;
+  players: { name: string; color: Color }[];
+  transcript: string;
+}
+
+export interface ReviewRes {
+  ok: boolean;
+  text?: string;
+  error?: string;
+}
+
+/** Optional server capabilities, surfaced via /health. */
+export interface ServerCaps {
+  ok: boolean;
+  accounts: boolean;
+  coach: boolean;
+}
+
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
 export interface RoomState {

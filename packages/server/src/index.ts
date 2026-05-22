@@ -21,6 +21,7 @@ import {
   usernameTaken,
 } from './db.js';
 import { hashPassword, signToken, verifyToken, verifyPassword } from './auth.js';
+import { coachEnabled, reviewGame } from './coach.js';
 
 const PORT = Number(process.env.PORT) || 3001;
 const ORIGIN = process.env.CLIENT_ORIGIN || '*';
@@ -28,7 +29,18 @@ const ORIGIN = process.env.CLIENT_ORIGIN || '*';
 const app = express();
 app.use(cors({ origin: ORIGIN }));
 app.use(express.json());
-app.get('/health', (_req, res) => res.json({ ok: true, accounts: dbEnabled }));
+app.get('/health', (_req, res) => res.json({ ok: true, accounts: dbEnabled, coach: coachEnabled }));
+
+// Lightweight per-IP rate limit for the (paid) review endpoint.
+const reviewHits = new Map<string, number[]>();
+function reviewAllowed(ip: string): boolean {
+  const now = Date.now();
+  const hits = (reviewHits.get(ip) ?? []).filter((t) => now - t < 60_000);
+  if (hits.length >= 6) return false;
+  hits.push(now);
+  reviewHits.set(ip, hits);
+  return true;
+}
 
 const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
 
@@ -96,6 +108,21 @@ app.get('/api/me', async (req, res) => {
 
 app.get('/api/leaderboard', async (_req, res) => {
   res.json(await leaderboard());
+});
+
+app.post('/api/review', async (req, res) => {
+  if (!coachEnabled) {
+    return res.json({ ok: false, error: 'Game review is not enabled on this server.' });
+  }
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'anon';
+  if (!reviewAllowed(ip)) {
+    return res.json({ ok: false, error: 'Too many reviews — give it a minute.' });
+  }
+  const { mode, result, players, transcript } = req.body ?? {};
+  if (typeof transcript !== 'string' || !Array.isArray(players) || !['2p', '3p', '4p'].includes(mode)) {
+    return res.json({ ok: false, error: 'Invalid review request.' });
+  }
+  res.json(await reviewGame({ mode, result: String(result ?? ''), players, transcript }));
 });
 
 // Serve the built client (if present) so the whole app runs on one origin.

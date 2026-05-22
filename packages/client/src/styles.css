@@ -26,6 +26,7 @@ body {
   overscroll-behavior: none;
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
 }
 
 /* Keep the header clear of the notch / status bar when installed. */

@@ -237,7 +237,7 @@ export function Lobby({ onCreate, onJoin, onSolo, onFindMatch }: Props) {
             </div>
 
             <form
-              className="flex gap-2"
+              className="flex flex-col gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (code.trim().length >= 3) onJoin(code.trim(), name);
@@ -245,13 +245,13 @@ export function Lobby({ onCreate, onJoin, onSolo, onFindMatch }: Props) {
             >
               <input
                 value={code}
-                placeholder="ABCD"
+                placeholder="CODE"
                 maxLength={4}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
-                className="flex-1 rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-center text-lg font-bold uppercase tracking-[0.4em] outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/40"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-center text-lg font-bold uppercase tracking-[0.5em] outline-none transition placeholder:tracking-[0.3em] placeholder:text-zinc-600 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/40"
               />
-              <Button type="submit" variant="subtle" className="px-5">
-                <LogIn className="h-4 w-4" /> Join
+              <Button type="submit" variant="subtle" className="w-full py-2.5" disabled={code.trim().length < 3}>
+                <LogIn className="h-4 w-4" /> Join game
               </Button>
             </form>
           </>

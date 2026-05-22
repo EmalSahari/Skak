@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, Check, Copy, Crown, Flag, Handshake, Loader, LogOut, Play, RotateCcw, Send } from 'lucide-react';
-import type { ChatMessage, Move, RoomSync } from '@skak/shared';
+import { Bot, Check, Copy, Crown, Flag, Handshake, Loader, LogOut, Play, RotateCcw, Send, Sparkles } from 'lucide-react';
+import type { Color, ChatMessage, Move, ReviewReq, RoomSync } from '@skak/shared';
 import { COLOR_HEX, COLOR_NAMES } from '@skak/shared';
 import { Board } from './Board.js';
 import { Clock } from './Clock.js';
+import { ReviewModal } from './ReviewModal.js';
 import { Button } from './ui/Button.js';
-import { moveLabel } from '../lib/format.js';
+import { buildTranscript, moveLabel } from '../lib/format.js';
 import { flagEmoji } from '../lib/countries.js';
 import { cn } from '../lib/cn.js';
 
@@ -23,6 +24,7 @@ interface Props {
   onDrawOffer?: () => void;
   onDrawRespond?: (accept: boolean) => void;
   local?: boolean;
+  coachEnabled?: boolean;
 }
 
 export function GameRoom({
@@ -38,6 +40,7 @@ export function GameRoom({
   onDrawOffer,
   onDrawRespond,
   local = false,
+  coachEnabled = false,
 }: Props) {
   const { room, snapshot, clock, drawOffer } = sync;
   const me = room.players.find((p) => p.id === playerId);
@@ -51,7 +54,17 @@ export function GameRoom({
 
   const [draft, setDraft] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+
+  const reviewPayload = (): ReviewReq => ({
+    mode: room.mode,
+    result: statusLine(),
+    players: room.players
+      .filter((p): p is typeof p & { color: Color } => p.color !== null)
+      .map((p) => ({ name: p.name, color: p.color })),
+    transcript: snapshot ? buildTranscript(snapshot.history, snapshot.size, room.mode) : '',
+  });
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -335,6 +348,14 @@ export function GameRoom({
                         Lobby
                       </Button>
                     </div>
+                    {coachEnabled && snapshot.history.length > 1 && (
+                      <button
+                        onClick={() => setShowReview(true)}
+                        className="mt-3 inline-flex items-center gap-1.5 text-sm text-brand-300 hover:underline"
+                      >
+                        <Sparkles className="h-4 w-4" /> Review game with AI coach
+                      </button>
+                    )}
                   </motion.div>
                 </motion.div>
               )}
@@ -359,6 +380,10 @@ export function GameRoom({
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {showReview && <ReviewModal payload={reviewPayload()} onClose={() => setShowReview(false)} />}
+      </AnimatePresence>
     </div>
   );
 }

@@ -10,7 +10,9 @@ import type {
   RoomSync,
   TimeControl,
 } from '@skak/shared';
+import type { ServerCaps } from '@skak/shared';
 import { socket } from './socket.js';
+import { apiGet } from './api.js';
 import { Lobby } from './components/Lobby.js';
 import { GameRoom } from './components/GameRoom.js';
 import { AuthModal } from './components/AuthModal.js';
@@ -57,6 +59,13 @@ export function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [searching, setSearching] = useState<GameMode | null>(null);
   const [matchStatus, setMatchStatus] = useState<MatchStatus | null>(null);
+  const [coachEnabled, setCoachEnabled] = useState(false);
+
+  useEffect(() => {
+    apiGet<ServerCaps>('/health')
+      .then((caps) => setCoachEnabled(!!caps.coach))
+      .catch(() => {});
+  }, []);
 
   const saveSession = useCallback((s: Session | null) => {
     setSession(s);
@@ -324,6 +333,7 @@ export function App() {
           onLeave={local.leave}
           onResign={local.resign}
           onRematch={local.rematch}
+          coachEnabled={coachEnabled}
           local
         />
       ) : inRoom ? (
@@ -339,6 +349,7 @@ export function App() {
           onDrawOffer={offerDraw}
           onDrawRespond={respondDraw}
           onRematch={requestRematch}
+          coachEnabled={coachEnabled}
         />
       ) : (
         <Lobby

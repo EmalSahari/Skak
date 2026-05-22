@@ -20,6 +20,10 @@ classic 2-player chess or free-for-all games with 3 or 4 armies.
   country, and (optional) email to get an Elo rating. Online 2-player games are
   ranked with Elo; 3- and 4-player games feed a separate "wins" board. Guests
   can still play by link without an account.
+- **Matchmaking** — "Play a stranger" pairs you with another player searching
+  the same mode, with a live estimated wait.
+- **AI coach** (optional) — a post-game "Review game" button asks an LLM for a
+  short, friendly review of the game. Requires `OPENAI_API_KEY` on the server.
 - **Real-time rooms** over WebSockets (Socket.IO) with auto-start when full,
   reconnect-on-refresh, a player list, turn/check indicators, and room chat.
 
@@ -59,6 +63,8 @@ set these environment variables on the server:
 | -------------- | -------------------------------------------------------------- |
 | `DATABASE_URL` | Postgres connection string (e.g. a free [Neon](https://neon.tech) database). The schema is created automatically on boot. |
 | `AUTH_SECRET`  | Secret used to sign auth tokens. Set a long random value.      |
+| `OPENAI_API_KEY` | (Optional) Enables the post-game "AI coach" review. Without it, the Review button is hidden. The key is only ever used server-side. |
+| `OPENAI_MODEL` | (Optional) Model for reviews; defaults to `gpt-4o-mini`.        |
 
 Passwords are stored hashed (scrypt); only username, optional email, and a
 two-letter country code are kept.
