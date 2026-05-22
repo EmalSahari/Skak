@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertTriangle, Crown, Wifi, WifiOff } from 'lucide-react';
 import type { ChatMessage, GameMode, Move, RoomSync } from '@skak/shared';
 import { socket } from './socket.js';
 import { Lobby } from './components/Lobby.js';
 import { GameRoom } from './components/GameRoom.js';
+import { cn } from './lib/cn.js';
 
 interface Session {
   roomId: string;
@@ -131,15 +134,43 @@ export function App() {
   const inRoom = session && sync && sync.room.id === session.roomId;
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <h1>♞ Skak</h1>
-        <span className={`conn ${connected ? 'on' : 'off'}`}>
+    <div className="flex min-h-full flex-col">
+      <div className="aurora" />
+
+      <header className="flex items-center justify-between border-b border-white/5 px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-2">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-blue-600 shadow-lg shadow-brand-600/30">
+            <Crown className="h-5 w-5 text-white" />
+          </span>
+          <div className="leading-tight">
+            <h1 className="text-lg font-bold tracking-tight">Skak</h1>
+            <p className="text-[11px] text-zinc-400">chess for 2, 3 &amp; 4</p>
+          </div>
+        </div>
+        <span
+          className={cn(
+            'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
+            connected ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300',
+          )}
+        >
+          {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
           {connected ? 'online' : 'connecting…'}
         </span>
       </header>
 
-      {error && <div className="toast">{error}</div>}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-red-500/30 bg-red-950/80 px-4 py-2.5 text-sm text-red-200 shadow-xl backdrop-blur"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {inRoom ? (
         <GameRoom

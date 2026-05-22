@@ -104,7 +104,7 @@ export function Board({ snapshot, myColor, onMove }: Props) {
   }
 
   return (
-    <div className="board-wrap">
+    <div className="relative">
       <div
         className="board"
         style={{
@@ -116,12 +116,22 @@ export function Board({ snapshot, myColor, onMove }: Props) {
       </div>
 
       {promoteFrom && (
-        <div className="promo-overlay" onClick={() => setPromoteFrom(null)}>
-          <div className="promo-picker" onClick={(e) => e.stopPropagation()}>
-            <p>Promote to</p>
-            <div className="promo-options">
+        <div
+          className="absolute inset-0 z-20 grid place-items-center rounded-2xl bg-black/60 backdrop-blur-sm"
+          onClick={() => setPromoteFrom(null)}
+        >
+          <div
+            className="rounded-2xl border border-white/10 bg-zinc-900/95 px-5 py-4 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="mb-3 text-sm font-medium text-zinc-300">Promote to</p>
+            <div className="flex gap-2">
               {PROMO.map((t) => (
-                <button key={t} onClick={() => choosePromotion(t)}>
+                <button
+                  key={t}
+                  onClick={() => choosePromotion(t)}
+                  className="grid h-16 w-16 place-items-center rounded-xl border border-white/10 bg-white/5 text-5xl leading-none transition hover:border-brand-500/60 hover:bg-brand-500/10"
+                >
                   <PieceGlyph type={t} color={myColor ?? 'w'} counterRotate={0} />
                 </button>
               ))}

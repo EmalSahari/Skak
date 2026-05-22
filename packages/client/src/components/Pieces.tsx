@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { Color, PieceType } from '@skak/shared';
 import { COLOR_HEX } from '@skak/shared';
 
@@ -26,11 +27,13 @@ export function PieceGlyph({
   return (
     <span
       className="piece"
-      style={{
-        color: COLOR_HEX[color],
-        textShadow: `0 0 1px ${outline}, 0 0 1px ${outline}, 0.5px 0.5px 0 ${outline}, -0.5px -0.5px 0 ${outline}`,
-        transform: counterRotate ? `rotate(${counterRotate}deg)` : undefined,
-      }}
+      style={
+        {
+          color: COLOR_HEX[color],
+          textShadow: `0 0 1px ${outline}, 0 0 1px ${outline}, 0.6px 0.6px 0 ${outline}, -0.6px -0.6px 0 ${outline}`,
+          '--cr': `${counterRotate}deg`,
+        } as CSSProperties
+      }
     >
       {GLYPH[type]}
     </span>
