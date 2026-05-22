@@ -25,15 +25,31 @@ export interface ChatMessage {
   ts: number;
 }
 
+/** Clock initial time and per-move increment, both in milliseconds. */
+export interface TimeControl {
+  initial: number;
+  increment: number;
+}
+
+/** Live clock state; `remaining[active]` is correct as of when it was sent. */
+export interface ClockState {
+  remaining: Partial<Record<Color, number>>;
+  active: Color | null;
+  running: boolean;
+}
+
 /** Everything a client needs to render a room: lobby + live game. */
 export interface RoomSync {
   room: RoomState;
   snapshot: EngineSnapshot | null;
+  clock: ClockState | null;
+  drawOffer: Color | null;
 }
 
 export interface CreateRoomReq {
   mode: GameMode;
   name: string;
+  timeControl?: TimeControl | null;
 }
 export interface CreateRoomRes {
   ok: boolean;
@@ -75,6 +91,10 @@ export interface ClientToServerEvents {
   'room:rejoin': (req: RejoinReq, cb: (res: CreateRoomRes) => void) => void;
   'room:start': (req: { roomId: string }, cb: (res: MoveRes) => void) => void;
   'room:leave': (req: { roomId: string }) => void;
+  'room:rematch': (req: { roomId: string }, cb: (res: MoveRes) => void) => void;
   'game:move': (req: MoveReq, cb: (res: MoveRes) => void) => void;
+  'game:resign': (req: { roomId: string }, cb: (res: MoveRes) => void) => void;
+  'game:draw-offer': (req: { roomId: string }, cb: (res: MoveRes) => void) => void;
+  'game:draw-respond': (req: { roomId: string; accept: boolean }, cb: (res: MoveRes) => void) => void;
   'room:chat': (req: { roomId: string; text: string }) => void;
 }

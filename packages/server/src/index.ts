@@ -31,11 +31,11 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: { origin: ORIGIN },
 });
 
-const manager = new RoomManager();
-
 function broadcast(room: Room) {
   io.to(room.id).emit('room:state', manager.sync(room));
 }
+
+const manager = new RoomManager(broadcast);
 
 io.on('connection', (socket) => {
   let myRoomId: string | null = null;
@@ -49,7 +49,7 @@ io.on('connection', (socket) => {
   };
 
   socket.on('room:create', (req, cb) => {
-    const { room, player } = manager.create(req.mode, req.name);
+    const { room, player } = manager.create(req.mode, req.name, req.timeControl ?? null);
     enter(room.id, player.id);
     cb({ ok: true, roomId: room.id, playerId: player.id, token: player.token });
     broadcast(room);
@@ -89,6 +89,42 @@ io.on('connection', (socket) => {
   socket.on('game:move', (req, cb) => {
     if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
     const result = manager.move(req.roomId, myPlayerId, req.move);
+    if (result.error) return cb({ ok: false, error: result.error });
+    cb({ ok: true });
+    const room = manager.get(req.roomId);
+    if (room) broadcast(room);
+  });
+
+  socket.on('game:resign', (req, cb) => {
+    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.resign(req.roomId, myPlayerId);
+    if (result.error) return cb({ ok: false, error: result.error });
+    cb({ ok: true });
+    const room = manager.get(req.roomId);
+    if (room) broadcast(room);
+  });
+
+  socket.on('game:draw-offer', (req, cb) => {
+    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.offerDraw(req.roomId, myPlayerId);
+    if (result.error) return cb({ ok: false, error: result.error });
+    cb({ ok: true });
+    const room = manager.get(req.roomId);
+    if (room) broadcast(room);
+  });
+
+  socket.on('game:draw-respond', (req, cb) => {
+    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.respondDraw(req.roomId, myPlayerId, req.accept);
+    if (result.error) return cb({ ok: false, error: result.error });
+    cb({ ok: true });
+    const room = manager.get(req.roomId);
+    if (room) broadcast(room);
+  });
+
+  socket.on('room:rematch', (req, cb) => {
+    if (!myPlayerId) return cb({ ok: false, error: 'Not in a room' });
+    const result = manager.rematch(req.roomId, myPlayerId);
     if (result.error) return cb({ ok: false, error: result.error });
     cb({ ok: true });
     const room = manager.get(req.roomId);

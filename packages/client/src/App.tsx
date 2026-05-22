@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, Crown, Wifi, WifiOff } from 'lucide-react';
-import type { ChatMessage, Difficulty, GameMode, Move, RoomSync } from '@skak/shared';
+import type { ChatMessage, Difficulty, GameMode, Move, RoomSync, TimeControl } from '@skak/shared';
 import { socket } from './socket.js';
 import { Lobby } from './components/Lobby.js';
 import { GameRoom } from './components/GameRoom.js';
@@ -79,8 +79,8 @@ export function App() {
   }, [saveSession]);
 
   const createRoom = useCallback(
-    (mode: GameMode, name: string) => {
-      socket.emit('room:create', { mode, name }, (res) => {
+    (mode: GameMode, name: string, timeControl: TimeControl | null) => {
+      socket.emit('room:create', { mode, name, timeControl }, (res) => {
         if (res.ok && res.roomId && res.playerId && res.token) {
           saveSession({ roomId: res.roomId, playerId: res.playerId, token: res.token });
           setChat([]);
@@ -126,6 +126,28 @@ export function App() {
     [session],
   );
 
+  const resignGame = useCallback(() => {
+    if (session) socket.emit('game:resign', { roomId: session.roomId }, () => {});
+  }, [session]);
+
+  const offerDraw = useCallback(() => {
+    if (session) socket.emit('game:draw-offer', { roomId: session.roomId }, () => {});
+  }, [session]);
+
+  const respondDraw = useCallback(
+    (accept: boolean) => {
+      if (session) socket.emit('game:draw-respond', { roomId: session.roomId, accept }, () => {});
+    },
+    [session],
+  );
+
+  const requestRematch = useCallback(() => {
+    if (session)
+      socket.emit('room:rematch', { roomId: session.roomId }, (res) => {
+        if (!res.ok) setError(res.error ?? 'Could not start rematch');
+      });
+  }, [session]);
+
   const leaveRoom = useCallback(() => {
     if (session) socket.emit('room:leave', { roomId: session.roomId });
     saveSession(null);
@@ -134,9 +156,9 @@ export function App() {
   }, [session, saveSession]);
 
   const startSolo = useCallback(
-    (mode: GameMode, name: string, difficulty: Difficulty) => {
+    (mode: GameMode, name: string, difficulty: Difficulty, timeControl: TimeControl | null) => {
       localStorage.setItem('skak.name', name);
-      local.start(mode, name, difficulty);
+      local.start(mode, name, difficulty, timeControl);
     },
     [local],
   );
@@ -191,6 +213,8 @@ export function App() {
           onMove={local.move}
           onChat={() => {}}
           onLeave={local.leave}
+          onResign={local.resign}
+          onRematch={local.rematch}
           local
         />
       ) : inRoom ? (
@@ -202,6 +226,10 @@ export function App() {
           onMove={sendMove}
           onChat={sendChat}
           onLeave={leaveRoom}
+          onResign={resignGame}
+          onDrawOffer={offerDraw}
+          onDrawRespond={respondDraw}
+          onRematch={requestRematch}
         />
       ) : (
         <Lobby onCreate={createRoom} onJoin={joinRoom} onSolo={startSolo} />

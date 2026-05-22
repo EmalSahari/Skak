@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Bot, LogIn, Sparkles, Users } from 'lucide-react';
-import type { Difficulty, GameMode } from '@skak/shared';
+import type { Difficulty, GameMode, TimeControl } from '@skak/shared';
 import { COLOR_HEX, MODE_COLORS } from '@skak/shared';
 import { Button } from './ui/Button.js';
 import { cn } from '../lib/cn.js';
@@ -18,15 +18,22 @@ const LEVELS: { value: Difficulty; label: string }[] = [
   { value: 'hard', label: 'Hard' },
 ];
 
+const TIME_CONTROLS: { label: string; value: TimeControl | null }[] = [
+  { label: 'No clock', value: null },
+  { label: '3 + 2', value: { initial: 180_000, increment: 2_000 } },
+  { label: '5 min', value: { initial: 300_000, increment: 0 } },
+  { label: '10 min', value: { initial: 600_000, increment: 0 } },
+];
+
 function hashCode(): string {
   const m = window.location.hash.match(/#\/?([A-Za-z0-9]{4})/);
   return m ? m[1].toUpperCase() : '';
 }
 
 interface Props {
-  onCreate: (mode: GameMode, name: string) => void;
+  onCreate: (mode: GameMode, name: string, tc: TimeControl | null) => void;
   onJoin: (roomId: string, name: string) => void;
-  onSolo: (mode: GameMode, name: string, difficulty: Difficulty) => void;
+  onSolo: (mode: GameMode, name: string, difficulty: Difficulty, tc: TimeControl | null) => void;
 }
 
 export function Lobby({ onCreate, onJoin, onSolo }: Props) {
@@ -35,6 +42,8 @@ export function Lobby({ onCreate, onJoin, onSolo }: Props) {
   const [code, setCode] = useState(hashCode);
   const [opponent, setOpponent] = useState<'online' | 'cpu'>('online');
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
+  const [tcIndex, setTcIndex] = useState(0);
+  const tc = TIME_CONTROLS[tcIndex].value;
 
   const remember = (n: string) => {
     setName(n);
@@ -141,6 +150,24 @@ export function Lobby({ onCreate, onJoin, onSolo }: Props) {
           })}
         </div>
 
+        <span className="mb-2 block text-xs font-medium text-zinc-400">Clock</span>
+        <div className="mb-5 grid grid-cols-4 gap-2">
+          {TIME_CONTROLS.map((t, i) => (
+            <button
+              key={t.label}
+              onClick={() => setTcIndex(i)}
+              className={cn(
+                'rounded-xl border py-2 text-xs font-medium transition',
+                tcIndex === i
+                  ? 'border-brand-500/70 bg-brand-500/10 text-white'
+                  : 'border-white/10 bg-white/[0.02] text-zinc-400 hover:text-zinc-200',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         {opponent === 'cpu' ? (
           <>
             <span className="mb-2 block text-xs font-medium text-zinc-400">Difficulty</span>
@@ -160,13 +187,13 @@ export function Lobby({ onCreate, onJoin, onSolo }: Props) {
                 </button>
               ))}
             </div>
-            <Button className="w-full py-3" onClick={() => onSolo(mode, name, difficulty)}>
+            <Button className="w-full py-3" onClick={() => onSolo(mode, name, difficulty, tc)}>
               <Bot className="h-4 w-4" /> Play vs {cpuLabel}
             </Button>
           </>
         ) : (
           <>
-            <Button className="w-full py-3" onClick={() => onCreate(mode, name)}>
+            <Button className="w-full py-3" onClick={() => onCreate(mode, name, tc)}>
               Create {mode.toUpperCase()} game <ArrowRight className="h-4 w-4" />
             </Button>
 

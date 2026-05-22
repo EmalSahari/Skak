@@ -1,10 +1,16 @@
-import type { Color, Coord, Move, Piece, PieceType, GameMode } from '../types.js';
+import type { Color, Coord, Move, MoveRecord, Piece, PieceType, GameMode } from '../types.js';
 
 export interface GameResult {
   over: boolean;
   winner: Color | null;
-  /** 'checkmate' | 'stalemate' | 'last-standing' | null */
-  reason: 'checkmate' | 'stalemate' | 'last-standing' | null;
+  reason:
+    | 'checkmate'
+    | 'stalemate'
+    | 'last-standing'
+    | 'resignation'
+    | 'timeout'
+    | 'agreement'
+    | null;
 }
 
 export interface GridSnapshot {
@@ -19,6 +25,7 @@ export interface GridSnapshot {
   checks: Color[];
   result: GameResult;
   lastMove: Move | null;
+  history: MoveRecord[];
 }
 
 export interface GridConfig {
@@ -80,6 +87,7 @@ export class GridChess {
   enPassant: { target: Coord; victim: Coord } | null = null;
   result: GameResult = { over: false, winner: null, reason: null };
   lastMove: Move | null = null;
+  history: MoveRecord[] = [];
 
   constructor(cfg: GridConfig) {
     this.mode = cfg.mode;
@@ -393,26 +401,49 @@ export class GridChess {
         ? (move.promotion as PieceType)
         : 'q';
     }
+    const mover = this.board[applied.from.r][applied.from.c]!;
+    const moverColor = mover.color;
+    const piece = mover.type;
+    const capture =
+      !!this.board[applied.to.r][applied.to.c] ||
+      (mover.type === 'p' && !!this.enPassant && eq(this.enPassant.target, applied.to));
     this.execute(applied);
     this.lastMove = applied;
+    this.history.push({
+      color: moverColor,
+      from: applied.from,
+      to: applied.to,
+      piece,
+      capture,
+      promotion: applied.promotion,
+      check: this.activeColors().some((c) => c !== moverColor && this.isInCheck(c)),
+    });
     this.advanceTurn();
     return true;
   }
 
   private advanceTurn() {
-    const order = this.colors;
-    let guard = 0;
-    do {
-      this.turnIndex = (this.turnIndex + 1) % order.length;
-      guard++;
-      const color = this.colors[this.turnIndex];
-      if (this.eliminated.includes(color)) continue;
-      const moves = this.allLegalMoves(color);
-      if (moves.length > 0) {
-        this.refreshResult();
+    this.turnIndex = (this.turnIndex + 1) % this.colors.length;
+    this.settle();
+  }
+
+  /** Resolve the side to move: skip eliminated armies and detect game endings. */
+  private settle() {
+    for (let guard = 0; guard <= this.colors.length * 2; guard++) {
+      if (this.activeColors().length <= 1 && this.colors.length > 1) {
+        this.result = {
+          over: true,
+          winner: this.activeColors()[0] ?? null,
+          reason: 'last-standing',
+        };
         return;
       }
-      // no legal moves for this color
+      const color = this.colors[this.turnIndex];
+      if (this.eliminated.includes(color)) {
+        this.turnIndex = (this.turnIndex + 1) % this.colors.length;
+        continue;
+      }
+      if (this.allLegalMoves(color).length > 0) return;
       const inCheck = this.isInCheck(color);
       if (this.mode === '2p') {
         const opponent = this.colors.find((c) => c !== color)!;
@@ -423,18 +454,34 @@ export class GridChess {
         };
         return;
       }
-      // 3p / 4p: eliminate this player and remove their pieces
       this.eliminate(color);
-      if (this.activeColors().length <= 1) {
-        this.result = {
-          over: true,
-          winner: this.activeColors()[0] ?? null,
-          reason: 'last-standing',
-        };
-        return;
-      }
-    } while (guard <= order.length * 2);
-    this.refreshResult();
+      this.turnIndex = (this.turnIndex + 1) % this.colors.length;
+    }
+  }
+
+  /** End the game for one army (resignation or flag-fall). */
+  endByElimination(color: Color, reason: 'resignation' | 'timeout') {
+    if (this.result.over || this.eliminated.includes(color)) return;
+    this.eliminate(color);
+    if (this.mode === '2p') {
+      const opponent = this.colors.find((c) => c !== color)!;
+      this.result = { over: true, winner: opponent, reason };
+      return;
+    }
+    if (this.activeColors().length <= 1) {
+      this.result = { over: true, winner: this.activeColors()[0] ?? null, reason: 'last-standing' };
+      return;
+    }
+    if (this.colors[this.turnIndex] === color) {
+      this.turnIndex = (this.turnIndex + 1) % this.colors.length;
+      this.settle();
+    }
+  }
+
+  /** End the game in a draw by agreement. */
+  declareDraw() {
+    if (this.result.over) return;
+    this.result = { over: true, winner: null, reason: 'agreement' };
   }
 
   private eliminate(color: Color) {
@@ -489,6 +536,7 @@ export class GridChess {
       checks: this.currentChecks(),
       result: clone(this.result),
       lastMove: this.lastMove ? clone(this.lastMove) : null,
+      history: clone(this.history),
     };
   }
 
@@ -499,5 +547,6 @@ export class GridChess {
     this.enPassant = s.enPassant ? clone(s.enPassant) : null;
     this.result = clone(s.result);
     this.lastMove = s.lastMove ? clone(s.lastMove) : null;
+    this.history = s.history ? clone(s.history) : [];
   }
 }

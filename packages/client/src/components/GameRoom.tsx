@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, Check, Copy, Crown, LogOut, Play, Send } from 'lucide-react';
+import { Bot, Check, Copy, Crown, Flag, Handshake, Loader, LogOut, Play, RotateCcw, Send } from 'lucide-react';
 import type { ChatMessage, Move, RoomSync } from '@skak/shared';
 import { COLOR_HEX, COLOR_NAMES } from '@skak/shared';
 import { Board } from './Board.js';
+import { Clock } from './Clock.js';
 import { Button } from './ui/Button.js';
+import { moveLabel } from '../lib/format.js';
 import { cn } from '../lib/cn.js';
 
 interface Props {
@@ -15,6 +17,10 @@ interface Props {
   onMove: (move: Move) => void;
   onChat: (text: string) => void;
   onLeave: () => void;
+  onResign: () => void;
+  onRematch: () => void;
+  onDrawOffer?: () => void;
+  onDrawRespond?: (accept: boolean) => void;
   local?: boolean;
 }
 
@@ -26,13 +32,18 @@ export function GameRoom({
   onMove,
   onChat,
   onLeave,
+  onResign,
+  onRematch,
+  onDrawOffer,
+  onDrawRespond,
   local = false,
 }: Props) {
-  const { room, snapshot } = sync;
+  const { room, snapshot, clock, drawOffer } = sync;
   const me = room.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
   const myColor = me?.color ?? null;
   const waiting = room.status === 'waiting';
+  const playing = room.status === 'playing';
 
   const turnColor = snapshot ? snapshot.colors[snapshot.turnIndex] : null;
   const playerByColor = (color: string) => room.players.find((p) => p.color === color);
@@ -136,15 +147,22 @@ export function GameRoom({
                   {p.id === playerId && <span className="text-zinc-500"> (you)</span>}
                 </span>
                 {p.isHost && <Crown className="h-3.5 w-3.5 text-amber-400" />}
-                <span className="text-[11px] text-zinc-400">
-                  {out
-                    ? 'out'
-                    : !p.connected
-                      ? 'offline'
-                      : p.color
-                        ? COLOR_NAMES[p.color]
-                        : ''}
-                </span>
+                {clock && p.color && clock.remaining[p.color] != null ? (
+                  <Clock
+                    ms={clock.remaining[p.color]!}
+                    active={clock.running && clock.active === p.color}
+                  />
+                ) : (
+                  <span className="text-[11px] text-zinc-400">
+                    {out
+                      ? 'out'
+                      : !p.connected
+                        ? 'offline'
+                        : p.color
+                          ? COLOR_NAMES[p.color]
+                          : ''}
+                  </span>
+                )}
               </li>
             );
           })}
@@ -170,6 +188,60 @@ export function GameRoom({
         >
           {statusLine()}
         </div>
+
+        {local && playing && turnColor && turnColor !== myColor && (
+          <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <Loader className="h-3.5 w-3.5 animate-spin" /> Computer is thinking…
+          </div>
+        )}
+
+        {drawOffer && drawOffer !== myColor && onDrawRespond && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+            <p className="mb-2 text-amber-200">Draw offered.</p>
+            <div className="flex gap-2">
+              <Button className="flex-1 py-2" onClick={() => onDrawRespond(true)}>
+                Accept
+              </Button>
+              <Button variant="ghost" className="flex-1 py-2" onClick={() => onDrawRespond(false)}>
+                Decline
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {playing && myColor && !snapshot?.eliminated.includes(myColor) && (
+          <div className="flex gap-2">
+            <Button variant="ghost" className="flex-1 py-2 text-xs" onClick={onResign}>
+              <Flag className="h-3.5 w-3.5" /> Resign
+            </Button>
+            {!local && room.mode === '2p' && onDrawOffer && (
+              <Button
+                variant="ghost"
+                className="flex-1 py-2 text-xs"
+                disabled={drawOffer === myColor}
+                onClick={onDrawOffer}
+              >
+                <Handshake className="h-3.5 w-3.5" />
+                {drawOffer === myColor ? 'Offered' : 'Offer draw'}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {snapshot && snapshot.history.length > 0 && (
+          <div className="rounded-xl border border-white/10 bg-black/20 p-2">
+            <div className="scroll-thin flex max-h-24 flex-wrap gap-x-2 gap-y-1 overflow-y-auto text-xs">
+              {snapshot.history.map((rec, i) => (
+                <span key={i} className="font-mono">
+                  <span className="text-zinc-600">{i + 1}.</span>{' '}
+                  <span style={{ color: COLOR_HEX[rec.color] }}>
+                    {moveLabel(rec, snapshot.size)}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {waiting && (
           <Button
@@ -252,9 +324,14 @@ export function GameRoom({
                   >
                     <Crown className="mx-auto mb-2 h-8 w-8 text-amber-400" />
                     <p className="text-lg font-bold">{statusLine()}</p>
-                    <Button variant="subtle" className="mt-4" onClick={onLeave}>
-                      Back to lobby
-                    </Button>
+                    <div className="mt-4 flex justify-center gap-2">
+                      <Button onClick={onRematch}>
+                        <RotateCcw className="h-4 w-4" /> Rematch
+                      </Button>
+                      <Button variant="subtle" onClick={onLeave}>
+                        Lobby
+                      </Button>
+                    </div>
                   </motion.div>
                 </motion.div>
               )}

@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import type { Color, Coord, EngineSnapshot, Move, PieceType } from '@skak/shared';
 import { engineFromSnapshot } from '@skak/shared';
 import { PieceGlyph } from './Pieces.js';
+import { sounds } from '../sound.js';
 
 const ROTATION: Record<Color, number> = { w: 0, b: 180, r: 0, y: 180, g: 90, u: 270 };
 const PROMO: PieceType[] = ['q', 'r', 'b', 'n'];
@@ -21,6 +23,22 @@ export function Board({ snapshot, myColor, onMove }: Props) {
 
   const engine = useMemo(() => engineFromSnapshot(snapshot), [snapshot]);
   const myTurn = !result.over && myColor === engine.currentColor();
+
+  // Sound effects when a move lands or the game ends.
+  const histLen = snapshot.history.length;
+  const prev = useRef({ len: histLen, over: result.over });
+  useEffect(() => {
+    if (histLen > prev.current.len) {
+      const rec = snapshot.history[histLen - 1];
+      if (result.over) sounds.end();
+      else if (rec.check) sounds.check();
+      else if (rec.capture) sounds.capture();
+      else sounds.move();
+    } else if (result.over && !prev.current.over) {
+      sounds.end();
+    }
+    prev.current = { len: histLen, over: result.over };
+  }, [histLen, result.over, snapshot.history]);
 
   const legal = useMemo(() => {
     if (!selected || !myTurn) return [];
@@ -92,12 +110,24 @@ export function Board({ snapshot, myColor, onMove }: Props) {
       ]
         .filter(Boolean)
         .join(' ');
+      const isDest = lastMove && lastMove.to.r === r && lastMove.to.c === c;
       cells.push(
         <div key={k} className={classes} onClick={() => clickCell(r, c)}>
           {legalSet.has(k) && <span className={piece ? 'capture-ring' : 'move-dot'} />}
-          {piece && (
-            <PieceGlyph type={piece.type} color={piece.color} counterRotate={-rotation} />
-          )}
+          {piece &&
+            (isDest ? (
+              <motion.span
+                key={histLen}
+                initial={{ scale: 0.4, opacity: 0.4 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 600, damping: 30 }}
+                className="inline-flex"
+              >
+                <PieceGlyph type={piece.type} color={piece.color} counterRotate={-rotation} />
+              </motion.span>
+            ) : (
+              <PieceGlyph type={piece.type} color={piece.color} counterRotate={-rotation} />
+            ))}
         </div>,
       );
     }

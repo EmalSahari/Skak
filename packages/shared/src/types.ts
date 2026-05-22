@@ -29,6 +29,17 @@ export interface Move {
   promotion?: PieceType;
 }
 
+/** A played move, retained for the move-history list. */
+export interface MoveRecord {
+  color: Color;
+  from: Coord;
+  to: Coord;
+  piece: PieceType;
+  capture: boolean;
+  promotion?: PieceType;
+  check: boolean;
+}
+
 export const PIECE_NAMES: Record<PieceType, string> = {
   p: 'Pawn',
   n: 'Knight',

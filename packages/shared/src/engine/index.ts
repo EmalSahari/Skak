@@ -20,6 +20,8 @@ export interface ChessEngine {
   legalMovesFrom(from: Coord): Move[];
   applyMove(move: Move): boolean;
   startWithColors(active: Color[]): void;
+  endByElimination(color: Color, reason: 'resignation' | 'timeout'): void;
+  declareDraw(): void;
   clone(): ChessEngine;
   snapshot(): EngineSnapshot;
   load(snapshot: EngineSnapshot): void;
