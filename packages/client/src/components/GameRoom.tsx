@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Copy, Crown, LogOut, Play, Send } from 'lucide-react';
+import { Bot, Check, Copy, Crown, LogOut, Play, Send } from 'lucide-react';
 import type { ChatMessage, Move, RoomSync } from '@skak/shared';
 import { COLOR_HEX, COLOR_NAMES } from '@skak/shared';
 import { Board } from './Board.js';
@@ -15,9 +15,19 @@ interface Props {
   onMove: (move: Move) => void;
   onChat: (text: string) => void;
   onLeave: () => void;
+  local?: boolean;
 }
 
-export function GameRoom({ sync, playerId, chat, onStart, onMove, onChat, onLeave }: Props) {
+export function GameRoom({
+  sync,
+  playerId,
+  chat,
+  onStart,
+  onMove,
+  onChat,
+  onLeave,
+  local = false,
+}: Props) {
   const { room, snapshot } = sync;
   const me = room.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
@@ -66,16 +76,30 @@ export function GameRoom({ sync, playerId, chat, onStart, onMove, onChat, onLeav
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-3 sm:p-4 lg:flex-row lg:items-start">
       {/* ---------- Side panel ---------- */}
       <aside className="flex w-full flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl backdrop-blur-xl lg:w-80 lg:shrink-0">
-        <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-zinc-400">Room code</div>
-            <div className="text-xl font-bold tracking-[0.3em]">{room.id}</div>
+        {local ? (
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+            <Bot className="h-5 w-5 text-brand-300" />
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-400">Single player</div>
+              <div className="text-sm font-semibold">vs Computer</div>
+            </div>
           </div>
-          <Button variant="subtle" className="px-3 py-2 text-xs" onClick={copyCode}>
-            {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-            {copied ? 'Copied' : 'Copy link'}
-          </Button>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-400">Room code</div>
+              <div className="text-xl font-bold tracking-[0.3em]">{room.id}</div>
+            </div>
+            <Button variant="subtle" className="px-3 py-2 text-xs" onClick={copyCode}>
+              {copied ? (
+                <Check className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+              {copied ? 'Copied' : 'Copy link'}
+            </Button>
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs text-zinc-300">
@@ -165,7 +189,7 @@ export function GameRoom({ sync, playerId, chat, onStart, onMove, onChat, onLeav
         )}
 
         {/* Chat */}
-        <div className="mt-auto border-t border-white/10 pt-3">
+        <div className={cn('mt-auto border-t border-white/10 pt-3', local && 'hidden')}>
           <div ref={logRef} className="scroll-thin mb-2 flex h-32 flex-col gap-1 overflow-y-auto text-sm">
             {chat.length === 0 && <p className="text-xs text-zinc-500">No messages yet.</p>}
             {chat.map((m, i) => (
@@ -201,7 +225,7 @@ export function GameRoom({ sync, playerId, chat, onStart, onMove, onChat, onLeav
           onClick={onLeave}
           className="flex items-center justify-center gap-2 text-xs text-zinc-500 transition hover:text-zinc-300"
         >
-          <LogOut className="h-3.5 w-3.5" /> Leave room
+          <LogOut className="h-3.5 w-3.5" /> {local ? 'Quit to lobby' : 'Leave room'}
         </button>
       </aside>
 

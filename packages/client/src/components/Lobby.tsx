@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, LogIn, Sparkles } from 'lucide-react';
-import type { GameMode } from '@skak/shared';
+import { ArrowRight, Bot, LogIn, Sparkles, Users } from 'lucide-react';
+import type { Difficulty, GameMode } from '@skak/shared';
 import { COLOR_HEX, MODE_COLORS } from '@skak/shared';
 import { Button } from './ui/Button.js';
 import { cn } from '../lib/cn.js';
 
 const MODES: { mode: GameMode; title: string; blurb: string }[] = [
-  { mode: '2p', title: '2 Players', blurb: 'Classic chess, you vs a friend.' },
+  { mode: '2p', title: '2 Players', blurb: 'Classic chess, you vs one opponent.' },
   { mode: '3p', title: '3 Players', blurb: 'Three armies, free-for-all.' },
   { mode: '4p', title: '4 Players', blurb: 'Four armies on the cross board.' },
+];
+
+const LEVELS: { value: Difficulty; label: string }[] = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'hard', label: 'Hard' },
 ];
 
 function hashCode(): string {
@@ -20,17 +26,23 @@ function hashCode(): string {
 interface Props {
   onCreate: (mode: GameMode, name: string) => void;
   onJoin: (roomId: string, name: string) => void;
+  onSolo: (mode: GameMode, name: string, difficulty: Difficulty) => void;
 }
 
-export function Lobby({ onCreate, onJoin }: Props) {
+export function Lobby({ onCreate, onJoin, onSolo }: Props) {
   const [name, setName] = useState(() => localStorage.getItem('skak.name') ?? '');
   const [mode, setMode] = useState<GameMode>('2p');
   const [code, setCode] = useState(hashCode);
+  const [opponent, setOpponent] = useState<'online' | 'cpu'>('online');
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal');
 
   const remember = (n: string) => {
     setName(n);
     localStorage.setItem('skak.name', n);
   };
+
+  const cpuLabel =
+    mode === '2p' ? 'a computer' : `${MODE_COLORS[mode].length - 1} computers`;
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 py-8 sm:py-12">
@@ -41,20 +53,41 @@ export function Lobby({ onCreate, onJoin }: Props) {
         className="mb-7 text-center"
       >
         <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-brand-300">
-          <Sparkles className="h-3.5 w-3.5" /> real-time online chess
+          <Sparkles className="h-3.5 w-3.5" /> online &amp; single-player chess
         </span>
         <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Play chess with{' '}
           <span className="bg-gradient-to-r from-brand-400 to-blue-400 bg-clip-text text-transparent">
-            your friends
+            friends or the computer
           </span>
         </h2>
         <p className="mt-2 text-sm text-zinc-400">
-          Create a room, share the code, and play with two, three, or four players.
+          Two, three, or four players — online together or solo against bots.
         </p>
       </motion.div>
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-2xl backdrop-blur-xl sm:p-6">
+        {/* Opponent toggle */}
+        <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/20 p-1">
+          {(
+            [
+              { v: 'online', label: 'Online with friends', icon: Users },
+              { v: 'cpu', label: 'Single player', icon: Bot },
+            ] as const
+          ).map(({ v, label, icon: Icon }) => (
+            <button
+              key={v}
+              onClick={() => setOpponent(v)}
+              className={cn(
+                'flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
+                opponent === v ? 'bg-brand-500/20 text-white' : 'text-zinc-400 hover:text-zinc-200',
+              )}
+            >
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
+        </div>
+
         <label className="mb-5 block">
           <span className="mb-1.5 block text-xs font-medium text-zinc-400">Your name</span>
           <input
@@ -108,34 +141,61 @@ export function Lobby({ onCreate, onJoin }: Props) {
           })}
         </div>
 
-        <Button className="w-full py-3" onClick={() => onCreate(mode, name)}>
-          Create {mode.toUpperCase()} game <ArrowRight className="h-4 w-4" />
-        </Button>
+        {opponent === 'cpu' ? (
+          <>
+            <span className="mb-2 block text-xs font-medium text-zinc-400">Difficulty</span>
+            <div className="mb-5 grid grid-cols-3 gap-2">
+              {LEVELS.map((l) => (
+                <button
+                  key={l.value}
+                  onClick={() => setDifficulty(l.value)}
+                  className={cn(
+                    'rounded-xl border py-2.5 text-sm font-medium transition',
+                    difficulty === l.value
+                      ? 'border-brand-500/70 bg-brand-500/10 text-white'
+                      : 'border-white/10 bg-white/[0.02] text-zinc-400 hover:text-zinc-200',
+                  )}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <Button className="w-full py-3" onClick={() => onSolo(mode, name, difficulty)}>
+              <Bot className="h-4 w-4" /> Play vs {cpuLabel}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button className="w-full py-3" onClick={() => onCreate(mode, name)}>
+              Create {mode.toUpperCase()} game <ArrowRight className="h-4 w-4" />
+            </Button>
 
-        <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
-          <span className="h-px flex-1 bg-white/10" />
-          or join with a code
-          <span className="h-px flex-1 bg-white/10" />
-        </div>
+            <div className="my-5 flex items-center gap-3 text-xs text-zinc-500">
+              <span className="h-px flex-1 bg-white/10" />
+              or join with a code
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
 
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (code.trim().length >= 3) onJoin(code.trim(), name);
-          }}
-        >
-          <input
-            value={code}
-            placeholder="ABCD"
-            maxLength={4}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            className="flex-1 rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-center text-lg font-bold uppercase tracking-[0.4em] outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/40"
-          />
-          <Button type="submit" variant="subtle" className="px-5">
-            <LogIn className="h-4 w-4" /> Join
-          </Button>
-        </form>
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (code.trim().length >= 3) onJoin(code.trim(), name);
+              }}
+            >
+              <input
+                value={code}
+                placeholder="ABCD"
+                maxLength={4}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                className="flex-1 rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-center text-lg font-bold uppercase tracking-[0.4em] outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/40"
+              />
+              <Button type="submit" variant="subtle" className="px-5">
+                <LogIn className="h-4 w-4" /> Join
+              </Button>
+            </form>
+          </>
+        )}
       </div>
     </main>
   );

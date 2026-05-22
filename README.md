@@ -10,6 +10,9 @@ classic 2-player chess or free-for-all games with 3 or 4 armies.
 - **3-player** & **4-player** — free-for-all on the cross board. When a player is
   checkmated they are eliminated and their pieces leave the board; the last
   army standing wins.
+- **Single player** — play offline against the built-in bot (Easy / Normal /
+  Hard) in any mode: one computer in 2-player, or two/three computers in the
+  3- and 4-player games. The bot runs entirely in the browser.
 - **Real-time rooms** over WebSockets (Socket.IO) with auto-start when full,
   reconnect-on-refresh, a player list, turn/check indicators, and room chat.
 

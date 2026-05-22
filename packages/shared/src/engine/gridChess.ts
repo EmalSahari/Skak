@@ -329,6 +329,14 @@ export class GridChess {
     return f;
   }
 
+  /** A full independent copy, safe to advance with applyMove (used by the bot). */
+  clone(): GridChess {
+    const f = this.fork();
+    f.result = { ...this.result };
+    f.lastMove = this.lastMove ? { ...this.lastMove } : null;
+    return f;
+  }
+
   /** Apply a move's board mutation without legality checks or turn advance. */
   private execute(move: Move) {
     const piece = this.board[move.from.r][move.from.c];

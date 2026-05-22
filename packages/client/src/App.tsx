@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, Crown, Wifi, WifiOff } from 'lucide-react';
-import type { ChatMessage, GameMode, Move, RoomSync } from '@skak/shared';
+import type { ChatMessage, Difficulty, GameMode, Move, RoomSync } from '@skak/shared';
 import { socket } from './socket.js';
 import { Lobby } from './components/Lobby.js';
 import { GameRoom } from './components/GameRoom.js';
+import { useLocalGame } from './useLocalGame.js';
 import { cn } from './lib/cn.js';
 
 interface Session {
@@ -32,6 +33,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  const local = useLocalGame();
 
   const saveSession = useCallback((s: Session | null) => {
     setSession(s);
@@ -131,6 +133,14 @@ export function App() {
     setChat([]);
   }, [session, saveSession]);
 
+  const startSolo = useCallback(
+    (mode: GameMode, name: string, difficulty: Difficulty) => {
+      localStorage.setItem('skak.name', name);
+      local.start(mode, name, difficulty);
+    },
+    [local],
+  );
+
   const inRoom = session && sync && sync.room.id === session.roomId;
 
   return (
@@ -172,7 +182,18 @@ export function App() {
         )}
       </AnimatePresence>
 
-      {inRoom ? (
+      {local.sync ? (
+        <GameRoom
+          sync={local.sync}
+          playerId="you"
+          chat={[]}
+          onStart={() => {}}
+          onMove={local.move}
+          onChat={() => {}}
+          onLeave={local.leave}
+          local
+        />
+      ) : inRoom ? (
         <GameRoom
           sync={sync!}
           playerId={session!.playerId}
@@ -183,7 +204,7 @@ export function App() {
           onLeave={leaveRoom}
         />
       ) : (
-        <Lobby onCreate={createRoom} onJoin={joinRoom} />
+        <Lobby onCreate={createRoom} onJoin={joinRoom} onSolo={startSolo} />
       )}
     </div>
   );
