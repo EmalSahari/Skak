@@ -18,6 +18,7 @@ export interface ChessEngine {
   currentColor(): Color;
   legalMovesFrom(from: Coord): Move[];
   applyMove(move: Move): boolean;
+  startWithColors(active: Color[]): void;
   snapshot(): EngineSnapshot;
   load(snapshot: EngineSnapshot): void;
   get result(): GameResult;

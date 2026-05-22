@@ -74,3 +74,19 @@ test('3p: three armies present, red to move', () => {
   assert.equal(g.currentColor(), 'r');
   assert.ok(g.legalMovesFrom({ r: 12, c: 5 }).length > 0);
 });
+
+test('4p: starting with a subset removes unfilled armies', () => {
+  const g = build4p();
+  g.startWithColors(['r', 'y']); // only red & yellow seated
+  const counts: Record<string, number> = {};
+  for (let r = 0; r < 14; r++)
+    for (let c = 0; c < 14; c++) {
+      const p = g.board[r][c];
+      if (p) counts[p.color] = (counts[p.color] ?? 0) + 1;
+    }
+  assert.deepEqual(counts, { r: 16, y: 16 });
+  assert.equal(g.currentColor(), 'r');
+  // turn order skips the removed blue/green seats
+  g.applyMove({ from: { r: 12, c: 5 }, to: { r: 11, c: 5 } }); // red pawn up
+  assert.equal(g.currentColor(), 'y');
+});

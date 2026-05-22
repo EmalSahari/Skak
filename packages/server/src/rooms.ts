@@ -96,8 +96,8 @@ export class RoomManager {
     const room = this.get(roomId);
     if (!room) return { error: 'Room not found' };
     if (room.hostId !== playerId) return { error: 'Only the host can start' };
+    if (room.status !== 'waiting') return { error: 'Game already started' };
     if (room.players.size < 2) return { error: 'Need at least 2 players' };
-    if (room.players.size < room.capacity) return { error: 'Waiting for more players' };
     this.beginGame(room);
     return {};
   }
@@ -196,7 +196,14 @@ export class RoomManager {
   }
 
   private beginGame(room: Room) {
-    room.engine = createEngine(room.mode);
+    const engine = createEngine(room.mode);
+    const active = [...room.players.values()]
+      .map((p) => p.color)
+      .filter((c): c is Color => c !== null);
+    if (active.length < MODE_COLORS[room.mode].length) {
+      engine.startWithColors(active);
+    }
+    room.engine = engine;
     room.status = 'playing';
   }
 

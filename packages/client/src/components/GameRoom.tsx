@@ -81,27 +81,36 @@ export function GameRoom({ sync, playerId, chat, onStart, onMove, onChat, onLeav
               </span>
             </li>
           ))}
-          {Array.from({ length: room.capacity - room.players.length }).map((_, i) => (
-            <li key={`empty-${i}`} className="empty">
-              <span className="dot" />
-              <span className="pname">waiting for player…</span>
-            </li>
-          ))}
+          {room.status === 'waiting' &&
+            Array.from({ length: room.capacity - room.players.length }).map((_, i) => (
+              <li key={`empty-${i}`} className="empty">
+                <span className="dot" />
+                <span className="pname">waiting for player…</span>
+              </li>
+            ))}
         </ul>
+
+        {room.status === 'waiting' && (
+          <p className="counter">
+            {room.players.length}/{room.capacity} players joined
+          </p>
+        )}
 
         <p className="status">{statusLine()}</p>
 
         {room.status === 'waiting' && (
           <button
             className="primary"
-            disabled={!isHost || room.players.length < room.capacity}
+            disabled={!isHost || room.players.length < 2}
             onClick={onStart}
           >
-            {room.players.length < room.capacity
-              ? `Need ${room.capacity - room.players.length} more`
-              : isHost
-                ? 'Start game'
-                : 'Waiting for host'}
+            {room.players.length < 2
+              ? `Need ${2 - room.players.length} more`
+              : !isHost
+                ? 'Waiting for host'
+                : room.players.length < room.capacity
+                  ? `Start now (${room.players.length}/${room.capacity})`
+                  : 'Start game'}
           </button>
         )}
 
@@ -143,7 +152,17 @@ export function GameRoom({ sync, playerId, chat, onStart, onMove, onChat, onLeav
           <div className="waiting-stage">
             <h2>Share the code to invite players</h2>
             <p className="bigcode">{room.id}</p>
-            <p>Game starts automatically once {room.capacity} players have joined.</p>
+            <p className="counter big">
+              {room.players.length}/{room.capacity} joined
+            </p>
+            <p>
+              Starts automatically when all {room.capacity} seats are filled
+              {isHost
+                ? room.players.length >= 2
+                  ? ' — or tap “Start now” to begin with who’s here.'
+                  : ' — you can start once a second player joins.'
+                : '.'}
+            </p>
           </div>
         )}
       </div>

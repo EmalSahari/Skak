@@ -452,6 +452,20 @@ export class GridChess {
     return this.activeColors().filter((c) => this.isInCheck(c));
   }
 
+  /**
+   * Begin a game with only `active` armies in play; any unfilled army is
+   * removed from the board so its turn is skipped. Used when the host starts
+   * a 3p/4p room before every seat is taken.
+   */
+  startWithColors(active: Color[]) {
+    for (const color of this.colors) {
+      if (!active.includes(color)) this.eliminate(color);
+    }
+    const first = this.colors.findIndex((c) => !this.eliminated.includes(c));
+    this.turnIndex = first >= 0 ? first : 0;
+    this.refreshResult();
+  }
+
   // ---- serialization ----
 
   snapshot(): GridSnapshot {
