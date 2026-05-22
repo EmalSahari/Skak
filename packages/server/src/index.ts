@@ -9,14 +9,93 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@skak/shared';
-import { RoomManager, type Room } from './rooms.js';
+import { RoomManager, type Account, type Room } from './rooms.js';
+import {
+  createUser,
+  dbEnabled,
+  findById,
+  findByUsername,
+  initDb,
+  leaderboard,
+  usernameTaken,
+} from './db.js';
+import { hashPassword, signToken, verifyToken, verifyPassword } from './auth.js';
 
 const PORT = Number(process.env.PORT) || 3001;
 const ORIGIN = process.env.CLIENT_ORIGIN || '*';
 
 const app = express();
 app.use(cors({ origin: ORIGIN }));
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.use(express.json());
+app.get('/health', (_req, res) => res.json({ ok: true, accounts: dbEnabled }));
+
+const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
+
+async function resolveAccount(token: string | undefined): Promise<Account | null> {
+  const uid = verifyToken(token);
+  if (uid == null) return null;
+  const user = await findById(uid);
+  if (!user) return null;
+  return { userId: user.id, username: user.username, rating: user.elo, country: user.country };
+}
+
+app.post('/api/signup', async (req, res) => {
+  if (!dbEnabled) return res.status(503).json({ ok: false, error: 'Accounts are not set up yet.' });
+  const { username, email, password, country } = req.body ?? {};
+  if (typeof username !== 'string' || !USERNAME_RE.test(username)) {
+    return res.json({ ok: false, error: 'Username must be 3–20 letters, numbers, or underscores.' });
+  }
+  if (typeof password !== 'string' || password.length < 6) {
+    return res.json({ ok: false, error: 'Password must be at least 6 characters.' });
+  }
+  try {
+    if (await usernameTaken(username)) {
+      return res.json({ ok: false, error: 'That username is taken.' });
+    }
+    const user = await createUser(
+      username,
+      typeof email === 'string' && email ? email.slice(0, 200) : null,
+      hashPassword(password),
+      typeof country === 'string' && country ? country.slice(0, 2).toUpperCase() : null,
+    );
+    return res.json({ ok: true, token: signToken(user.id), user });
+  } catch (err) {
+    console.error('signup failed', err);
+    return res.status(500).json({ ok: false, error: 'Could not create account.' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  if (!dbEnabled) return res.status(503).json({ ok: false, error: 'Accounts are not set up yet.' });
+  const { username, password } = req.body ?? {};
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.json({ ok: false, error: 'Missing credentials.' });
+  }
+  try {
+    const row = await findByUsername(username);
+    if (!row || !verifyPassword(password, row.password_hash)) {
+      return res.json({ ok: false, error: 'Wrong username or password.' });
+    }
+    const { password_hash, ...user } = row;
+    void password_hash;
+    return res.json({ ok: true, token: signToken(user.id), user });
+  } catch (err) {
+    console.error('login failed', err);
+    return res.status(500).json({ ok: false, error: 'Could not log in.' });
+  }
+});
+
+app.get('/api/me', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer /, '');
+  const uid = verifyToken(token);
+  if (uid == null) return res.json({ ok: false, error: 'Not signed in.' });
+  const user = await findById(uid);
+  return user ? res.json({ ok: true, user }) : res.json({ ok: false, error: 'Account not found.' });
+});
+
+app.get('/api/leaderboard', async (_req, res) => {
+  res.json(await leaderboard());
+});
 
 // Serve the built client (if present) so the whole app runs on one origin.
 const clientDist = fileURLToPath(new URL('../../client/dist', import.meta.url));
@@ -48,15 +127,17 @@ io.on('connection', (socket) => {
     manager.bindSocket(roomId, playerId, socket.id);
   };
 
-  socket.on('room:create', (req, cb) => {
-    const { room, player } = manager.create(req.mode, req.name, req.timeControl ?? null);
+  socket.on('room:create', async (req, cb) => {
+    const account = await resolveAccount(req.authToken);
+    const { room, player } = manager.create(req.mode, req.name, req.timeControl ?? null, account);
     enter(room.id, player.id);
     cb({ ok: true, roomId: room.id, playerId: player.id, token: player.token });
     broadcast(room);
   });
 
-  socket.on('room:join', (req, cb) => {
-    const result = manager.join(req.roomId, req.name);
+  socket.on('room:join', async (req, cb) => {
+    const account = await resolveAccount(req.authToken);
+    const result = manager.join(req.roomId, req.name, account);
     if ('error' in result) {
       cb({ ok: false, error: result.error });
       return;
@@ -147,6 +228,10 @@ io.on('connection', (socket) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Skak server listening on http://localhost:${PORT}`);
-});
+initDb()
+  .catch((err) => console.error('Database init failed:', err))
+  .finally(() => {
+    httpServer.listen(PORT, () => {
+      console.log(`Skak server listening on http://localhost:${PORT}`);
+    });
+  });

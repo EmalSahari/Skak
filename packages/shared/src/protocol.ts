@@ -7,6 +7,49 @@ export interface PlayerInfo {
   color: Color | null;
   connected: boolean;
   isHost: boolean;
+  rating: number | null;
+  country: string | null;
+}
+
+/** A registered account, as exposed to clients (no password/email). */
+export interface PublicUser {
+  id: number;
+  username: string;
+  country: string | null;
+  elo: number;
+  w2: number;
+  l2: number;
+  d2: number;
+  played3: number;
+  won3: number;
+  played4: number;
+  won4: number;
+}
+
+export interface AuthResponse {
+  ok: boolean;
+  error?: string;
+  token?: string;
+  user?: PublicUser;
+}
+
+export interface EloEntry {
+  username: string;
+  country: string | null;
+  elo: number;
+  games: number;
+}
+
+export interface WinsEntry {
+  username: string;
+  country: string | null;
+  wins: number;
+  games: number;
+}
+
+export interface Leaderboard {
+  elo: EloEntry[];
+  wins: WinsEntry[];
 }
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
@@ -50,6 +93,7 @@ export interface CreateRoomReq {
   mode: GameMode;
   name: string;
   timeControl?: TimeControl | null;
+  authToken?: string;
 }
 export interface CreateRoomRes {
   ok: boolean;
@@ -62,12 +106,14 @@ export interface CreateRoomRes {
 export interface JoinRoomReq {
   roomId: string;
   name: string;
+  authToken?: string;
 }
 export type JoinRoomRes = CreateRoomRes;
 
 export interface RejoinReq {
   roomId: string;
   token: string;
+  authToken?: string;
 }
 
 export interface MoveReq {

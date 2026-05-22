@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, Crown, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, Crown, LogOut, Trophy, Wifi, WifiOff } from 'lucide-react';
 import type { ChatMessage, Difficulty, GameMode, Move, RoomSync, TimeControl } from '@skak/shared';
 import { socket } from './socket.js';
 import { Lobby } from './components/Lobby.js';
 import { GameRoom } from './components/GameRoom.js';
+import { AuthModal } from './components/AuthModal.js';
+import { Leaderboard } from './components/Leaderboard.js';
 import { useLocalGame } from './useLocalGame.js';
+import { useAuth } from './useAuth.js';
+import { flagEmoji } from './lib/countries.js';
+import { Button } from './components/ui/Button.js';
 import { cn } from './lib/cn.js';
 
 interface Session {
@@ -34,6 +39,11 @@ export function App() {
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const local = useLocalGame();
+  const auth = useAuth();
+  const authTokenRef = useRef(auth.token);
+  authTokenRef.current = auth.token;
+  const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
+  const [showBoard, setShowBoard] = useState(false);
 
   const saveSession = useCallback((s: Session | null) => {
     setSession(s);
@@ -80,7 +90,7 @@ export function App() {
 
   const createRoom = useCallback(
     (mode: GameMode, name: string, timeControl: TimeControl | null) => {
-      socket.emit('room:create', { mode, name, timeControl }, (res) => {
+      socket.emit('room:create', { mode, name, timeControl, authToken: authTokenRef.current ?? undefined }, (res) => {
         if (res.ok && res.roomId && res.playerId && res.token) {
           saveSession({ roomId: res.roomId, playerId: res.playerId, token: res.token });
           setChat([]);
@@ -92,7 +102,7 @@ export function App() {
 
   const joinRoom = useCallback(
     (roomId: string, name: string) => {
-      socket.emit('room:join', { roomId: roomId.toUpperCase(), name }, (res) => {
+      socket.emit('room:join', { roomId: roomId.toUpperCase(), name, authToken: authTokenRef.current ?? undefined }, (res) => {
         if (res.ok && res.roomId && res.playerId && res.token) {
           saveSession({ roomId: res.roomId, playerId: res.playerId, token: res.token });
           setChat([]);
@@ -155,6 +165,13 @@ export function App() {
     setChat([]);
   }, [session, saveSession]);
 
+  // Refresh the signed-in user's rating once an online game finishes.
+  const onlineOver = !local.sync && (sync?.snapshot?.result.over ?? false);
+  useEffect(() => {
+    if (onlineOver && auth.token) auth.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineOver]);
+
   const startSolo = useCallback(
     (mode: GameMode, name: string, difficulty: Difficulty, timeControl: TimeControl | null) => {
       localStorage.setItem('skak.name', name);
@@ -179,15 +196,52 @@ export function App() {
             <p className="text-[11px] text-zinc-400">chess for 2, 3 &amp; 4</p>
           </div>
         </div>
-        <span
-          className={cn(
-            'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
-            connected ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300',
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => setShowBoard(true)}
+            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-white/10"
+          >
+            <Trophy className="h-3.5 w-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Leaderboard</span>
+          </button>
+
+          {auth.user ? (
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1 pl-3 pr-1 text-xs">
+              <span>{flagEmoji(auth.user.country)}</span>
+              <span className="font-semibold">{auth.user.username}</span>
+              <span className="font-mono text-brand-300">{auth.user.elo}</span>
+              <button
+                onClick={auth.logout}
+                title="Log out"
+                className="grid h-6 w-6 place-items-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setAuthModal('login')}
+                className="rounded-full px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white"
+              >
+                Log in
+              </button>
+              <Button className="px-3 py-1.5 text-xs" onClick={() => setAuthModal('signup')}>
+                Sign up
+              </Button>
+            </>
           )}
-        >
-          {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-          {connected ? 'online' : 'connecting…'}
-        </span>
+
+          <span
+            className={cn(
+              'hidden items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium sm:flex',
+              connected ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300',
+            )}
+          >
+            {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+            {connected ? 'online' : 'connecting…'}
+          </span>
+        </div>
       </header>
 
       <AnimatePresence>
@@ -234,6 +288,18 @@ export function App() {
       ) : (
         <Lobby onCreate={createRoom} onJoin={joinRoom} onSolo={startSolo} />
       )}
+
+      <AnimatePresence>
+        {authModal && (
+          <AuthModal
+            initialMode={authModal}
+            onClose={() => setAuthModal(null)}
+            onLogin={auth.login}
+            onSignup={auth.signup}
+          />
+        )}
+        {showBoard && <Leaderboard onClose={() => setShowBoard(false)} />}
+      </AnimatePresence>
     </div>
   );
 }

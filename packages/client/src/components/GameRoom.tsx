@@ -7,6 +7,7 @@ import { Board } from './Board.js';
 import { Clock } from './Clock.js';
 import { Button } from './ui/Button.js';
 import { moveLabel } from '../lib/format.js';
+import { flagEmoji } from '../lib/countries.js';
 import { cn } from '../lib/cn.js';
 
 interface Props {
@@ -142,8 +143,10 @@ export function GameRoom({
                   className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-black/40"
                   style={{ background: p.color ? COLOR_HEX[p.color] : '#71717a' }}
                 />
+                {p.country && <span title={p.country}>{flagEmoji(p.country)}</span>}
                 <span className="flex-1 truncate">
                   {p.name}
+                  {p.rating != null && <span className="ml-1 font-mono text-[11px] text-zinc-500">{p.rating}</span>}
                   {p.id === playerId && <span className="text-zinc-500"> (you)</span>}
                 </span>
                 {p.isHost && <Crown className="h-3.5 w-3.5 text-amber-400" />}

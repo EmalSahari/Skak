@@ -10,3 +10,11 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Auth token signing secret — Render generates a random value.
+      - key: AUTH_SECRET
+        generateValue: true
+      # Set this to a Postgres connection string (e.g. a free Neon database)
+      # to enable accounts, ratings, and leaderboards. Leave unset to run
+      # without accounts. Configured in the Render dashboard, not in git.
+      - key: DATABASE_URL
+        sync: false

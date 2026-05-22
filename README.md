@@ -13,6 +13,13 @@ classic 2-player chess or free-for-all games with 3 or 4 armies.
 - **Single player** — play offline against the built-in bot (Easy / Normal /
   Hard) in any mode: one computer in 2-player, or two/three computers in the
   3- and 4-player games. The bot runs entirely in the browser.
+- **Clocks & controls** — optional time controls (3+2, 5, 10 min) with
+  server-authoritative flag-fall, plus resign, draw offers (2p), a move-history
+  list, and a rematch button.
+- **Accounts & leaderboards** (optional) — sign up with a username, password,
+  country, and (optional) email to get an Elo rating. Online 2-player games are
+  ranked with Elo; 3- and 4-player games feed a separate "wins" board. Guests
+  can still play by link without an account.
 - **Real-time rooms** over WebSockets (Socket.IO) with auto-start when full,
   reconnect-on-refresh, a player list, turn/check indicators, and room chat.
 
@@ -41,6 +48,20 @@ room link) in another tab/device to join. A 2-player game starts automatically
 once 2 players join; 3- and 4-player games start when their seats are full.
 
 Set `VITE_SERVER_URL` for the client if the server is not on `host:3001`.
+
+### Accounts & leaderboard (optional)
+
+Accounts, ratings, and leaderboards need a Postgres database. The app runs fine
+without one — it just disables sign-up and leaves games unranked. To enable it,
+set these environment variables on the server:
+
+| Variable       | Purpose                                                        |
+| -------------- | -------------------------------------------------------------- |
+| `DATABASE_URL` | Postgres connection string (e.g. a free [Neon](https://neon.tech) database). The schema is created automatically on boot. |
+| `AUTH_SECRET`  | Secret used to sign auth tokens. Set a long random value.      |
+
+Passwords are stored hashed (scrypt); only username, optional email, and a
+two-letter country code are kept.
 
 ## Other commands
 

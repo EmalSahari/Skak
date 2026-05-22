@@ -13,6 +13,14 @@ import {
   type RoomSync,
   type TimeControl,
 } from '@skak/shared';
+import { recordEloResult, recordMultiplayerResult } from './db.js';
+
+export interface Account {
+  userId: number;
+  username: string;
+  rating: number;
+  country: string | null;
+}
 
 interface Player {
   id: string;
@@ -21,6 +29,9 @@ interface Player {
   color: Color | null;
   connected: boolean;
   socketId: string | null;
+  userId: number | null;
+  rating: number | null;
+  country: string | null;
 }
 
 export interface Room {
@@ -39,6 +50,7 @@ export interface Room {
   turnStart: number;
   clockTimer: NodeJS.Timeout | null;
   drawOffer: Color | null;
+  recorded: boolean;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -58,9 +70,14 @@ export class RoomManager {
   /** `broadcast` lets async clock flag-falls push a fresh state to the room. */
   constructor(private broadcast: (room: Room) => void) {}
 
-  create(mode: GameMode, name: string, timeControl: TimeControl | null): { room: Room; player: Player } {
+  create(
+    mode: GameMode,
+    name: string,
+    timeControl: TimeControl | null,
+    account: Account | null,
+  ): { room: Room; player: Player } {
     const id = makeCode(new Set(this.rooms.keys()));
-    const player = this.newPlayer(name);
+    const player = this.newPlayer(name, account);
     const room: Room = {
       id,
       mode,
@@ -77,6 +94,7 @@ export class RoomManager {
       turnStart: 0,
       clockTimer: null,
       drawOffer: null,
+      recorded: false,
     };
     this.assignColors(room);
     this.rooms.set(id, room);
@@ -87,12 +105,19 @@ export class RoomManager {
     return this.rooms.get(id.toUpperCase());
   }
 
-  join(id: string, name: string): { room: Room; player: Player } | { error: string } {
+  join(
+    id: string,
+    name: string,
+    account: Account | null,
+  ): { room: Room; player: Player } | { error: string } {
     const room = this.get(id);
     if (!room) return { error: 'Room not found' };
     if (room.status !== 'waiting') return { error: 'Game already started' };
     if (room.players.size >= room.capacity) return { error: 'Room is full' };
-    const player = this.newPlayer(name);
+    if (account && [...room.players.values()].some((p) => p.userId === account.userId)) {
+      return { error: 'You are already in this room' };
+    }
+    const player = this.newPlayer(name, account);
     room.players.set(player.id, player);
     this.assignColors(room);
     this.maybeStart(room);
@@ -230,9 +255,34 @@ export class RoomManager {
     return { remaining, active, running };
   }
 
+  /** Persist Elo / win-count changes once a game is over. */
+  private recordResult(room: Room) {
+    if (!room.engine || !room.engine.result.over || room.recorded) return;
+    room.recorded = true;
+    const { winner } = room.engine.result;
+    const humans = [...room.players.values()].filter((p) => p.userId != null && p.color);
+    if (room.mode === '2p') {
+      if (humans.length !== 2) return;
+      if (winner) {
+        const w = humans.find((p) => p.color === winner);
+        const l = humans.find((p) => p.color !== winner);
+        if (w && l) void recordEloResult(w.userId!, l.userId!, null);
+      } else {
+        void recordEloResult(null, null, [humans[0].userId!, humans[1].userId!]);
+      }
+    } else {
+      for (const p of humans) {
+        void recordMultiplayerResult(p.userId!, room.mode as '3p' | '4p', winner === p.color);
+      }
+    }
+  }
+
   /** Charge the player who just moved, then (re)arm or stop the clock. */
   private afterTurn(room: Room) {
-    if (room.engine?.result.over) room.status = 'finished';
+    if (room.engine?.result.over) {
+      room.status = 'finished';
+      this.recordResult(room);
+    }
     if (!room.timeControl || !room.engine) return;
     const now = Date.now();
     const moved = room.activeColor;
@@ -271,6 +321,7 @@ export class RoomManager {
     room.engine.endByElimination(color, 'timeout');
     if (room.engine.result.over) {
       room.status = 'finished';
+      this.recordResult(room);
       this.clearClock(room);
     } else {
       this.startClock(room);
@@ -287,18 +338,23 @@ export class RoomManager {
       color: p.color,
       connected: p.connected,
       isHost: p.id === room.hostId,
+      rating: p.rating,
+      country: p.country,
     }));
     return { id: room.id, mode: room.mode, status: room.status, capacity: room.capacity, players };
   }
 
-  private newPlayer(name: string): Player {
+  private newPlayer(name: string, account: Account | null): Player {
     return {
       id: randomUUID(),
       token: randomUUID(),
-      name: (name || 'Player').slice(0, 24),
+      name: (account?.username || name || 'Player').slice(0, 24),
       color: null,
       connected: true,
       socketId: null,
+      userId: account?.userId ?? null,
+      rating: account?.rating ?? null,
+      country: account?.country ?? null,
     };
   }
 
@@ -332,6 +388,7 @@ export class RoomManager {
     room.engine = engine;
     room.status = 'playing';
     room.drawOffer = null;
+    room.recorded = false;
     this.clearClock(room);
     if (room.timeControl) {
       room.clocks = {};

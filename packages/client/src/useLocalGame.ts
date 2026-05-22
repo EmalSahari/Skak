@@ -150,10 +150,18 @@ export function useLocalGame() {
     let cpuCount = 0;
     const players: PlayerInfo[] = colors.map((c) => {
       if (c === cfg.human) {
-        return { id: 'you', name: cfg.name, color: c, connected: true, isHost: true };
+        return { id: 'you', name: cfg.name, color: c, connected: true, isHost: true, rating: null, country: null };
       }
       cpuCount += 1;
-      return { id: `cpu-${c}`, name: cpuName(cpuCount, colors.length), color: c, connected: true, isHost: false };
+      return {
+        id: `cpu-${c}`,
+        name: cpuName(cpuCount, colors.length),
+        color: c,
+        connected: true,
+        isHost: false,
+        rating: null,
+        country: null,
+      };
     });
 
     let clock: ClockState | null = null;
