@@ -18,18 +18,39 @@ import {
   findByUsername,
   initDb,
   leaderboard,
+  refundReview,
+  setBoardTheme,
+  tryConsumeReview,
   usernameTaken,
 } from './db.js';
 import { hashPassword, signToken, verifyToken, verifyPassword } from './auth.js';
 import { coachEnabled, reviewGame } from './coach.js';
+import {
+  billingEnabled,
+  createCheckoutSession,
+  createPortalSession,
+  handleWebhook,
+} from './billing.js';
+import { BOARD_THEMES, type BoardTheme } from '@skak/shared';
 
 const PORT = Number(process.env.PORT) || 3001;
 const ORIGIN = process.env.CLIENT_ORIGIN || '*';
 
 const app = express();
 app.use(cors({ origin: ORIGIN }));
+
+// Stripe webhook MUST receive the raw body to verify the signature, so it is
+// registered with express.raw before the global express.json() middleware.
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const result = await handleWebhook(req.body as Buffer, req.headers['stripe-signature'] as string | undefined);
+  if (!result.ok) return res.status(400).send(result.error ?? 'Bad request');
+  res.json({ received: true });
+});
+
 app.use(express.json());
-app.get('/health', (_req, res) => res.json({ ok: true, accounts: dbEnabled, coach: coachEnabled }));
+app.get('/health', (_req, res) =>
+  res.json({ ok: true, accounts: dbEnabled, coach: coachEnabled, billing: billingEnabled }),
+);
 
 // Lightweight per-IP rate limit for the (paid) review endpoint.
 const reviewHits = new Map<string, number[]>();
@@ -49,7 +70,13 @@ async function resolveAccount(token: string | undefined): Promise<Account | null
   if (uid == null) return null;
   const user = await findById(uid);
   if (!user) return null;
-  return { userId: user.id, username: user.username, rating: user.elo, country: user.country };
+  return {
+    userId: user.id,
+    username: user.username,
+    rating: user.elo,
+    country: user.country,
+    pro: user.pro,
+  };
 }
 
 app.post('/api/signup', async (req, res) => {
@@ -114,15 +141,57 @@ app.post('/api/review', async (req, res) => {
   if (!coachEnabled) {
     return res.json({ ok: false, error: 'Game review is not enabled on this server.' });
   }
+  const token = req.headers.authorization?.replace(/^Bearer /, '');
+  const uid = verifyToken(token);
+  if (uid == null) {
+    return res.json({ ok: false, error: 'Sign in to use the AI coach.' });
+  }
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'anon';
   if (!reviewAllowed(ip)) {
     return res.json({ ok: false, error: 'Too many reviews — give it a minute.' });
   }
+  const quota = await tryConsumeReview(uid);
+  if (!quota.allowed) {
+    return res.json({
+      ok: false,
+      error: `Daily free reviews used (${quota.limit}/day). Upgrade to Pro for unlimited reviews.`,
+    });
+  }
   const { mode, result, players, transcript } = req.body ?? {};
   if (typeof transcript !== 'string' || !Array.isArray(players) || !['2p', '3p', '4p'].includes(mode)) {
+    await refundReview(uid);
     return res.json({ ok: false, error: 'Invalid review request.' });
   }
-  res.json(await reviewGame({ mode, result: String(result ?? ''), players, transcript }));
+  const out = await reviewGame({ mode, result: String(result ?? ''), players, transcript });
+  if (!out.ok && !quota.isPro) await refundReview(uid);
+  res.json(out);
+});
+
+app.post('/api/billing/checkout', async (req, res) => {
+  const uid = verifyToken(req.headers.authorization?.replace(/^Bearer /, ''));
+  if (uid == null) return res.json({ ok: false, error: 'Sign in to upgrade.' });
+  const user = await findById(uid);
+  if (!user) return res.json({ ok: false, error: 'Account not found.' });
+  res.json(await createCheckoutSession(uid, user.username, null));
+});
+
+app.post('/api/billing/portal', async (req, res) => {
+  const uid = verifyToken(req.headers.authorization?.replace(/^Bearer /, ''));
+  if (uid == null) return res.json({ ok: false, error: 'Sign in first.' });
+  res.json(await createPortalSession(uid));
+});
+
+app.post('/api/me/theme', async (req, res) => {
+  const uid = verifyToken(req.headers.authorization?.replace(/^Bearer /, ''));
+  if (uid == null) return res.json({ ok: false, error: 'Sign in first.' });
+  const user = await findById(uid);
+  if (!user?.pro) return res.json({ ok: false, error: 'Custom board themes are a Pro perk.' });
+  const theme = req.body?.theme;
+  if (theme !== null && !BOARD_THEMES.includes(theme)) {
+    return res.json({ ok: false, error: 'Unknown theme.' });
+  }
+  const updated = await setBoardTheme(uid, theme as BoardTheme | null);
+  return updated ? res.json({ ok: true, user: updated }) : res.json({ ok: false, error: 'Could not update.' });
 });
 
 // Serve the built client (if present) so the whole app runs on one origin.

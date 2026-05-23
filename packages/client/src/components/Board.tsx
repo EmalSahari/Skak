@@ -12,11 +12,12 @@ interface Props {
   snapshot: EngineSnapshot;
   myColor: Color | null;
   onMove: (move: Move) => void;
+  theme?: string | null;
 }
 
 const key = (r: number, c: number) => `${r},${c}`;
 
-export function Board({ snapshot, myColor, onMove }: Props) {
+export function Board({ snapshot, myColor, onMove, theme }: Props) {
   const { size, voids, board, lastMove, checks, result } = snapshot;
   const [selected, setSelected] = useState<Coord | null>(null);
   const [promoteFrom, setPromoteFrom] = useState<{ from: Coord; to: Coord } | null>(null);
@@ -137,6 +138,7 @@ export function Board({ snapshot, myColor, onMove }: Props) {
     <div className="relative">
       <div
         className="board"
+        data-theme={theme || 'classic'}
         style={{
           gridTemplateColumns: `repeat(${size}, 1fr)`,
           transform: `rotate(${rotation}deg)`,

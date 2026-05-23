@@ -84,6 +84,27 @@ body {
 }
 
 /* ---------- Chess board (custom, container-query sized) ---------- */
+.board,
+[data-theme] {
+  --sq-light: #d7dde8;
+  --sq-dark: #58708f;
+}
+[data-theme='midnight'] {
+  --sq-light: #6b7793;
+  --sq-dark: #2d3142;
+}
+[data-theme='forest'] {
+  --sq-light: #d8e2c1;
+  --sq-dark: #4a6a3c;
+}
+[data-theme='sunset'] {
+  --sq-light: #f9d9b1;
+  --sq-dark: #b25f3d;
+}
+[data-theme='mono'] {
+  --sq-light: #d4d4d8;
+  --sq-dark: #52525b;
+}
 .board {
   display: grid;
   aspect-ratio: 1;
@@ -102,10 +123,10 @@ body {
   cursor: pointer;
 }
 .cell.light {
-  background: #d7dde8;
+  background: var(--sq-light);
 }
 .cell.dark {
-  background: #58708f;
+  background: var(--sq-dark);
 }
 .cell.void {
   background: transparent;

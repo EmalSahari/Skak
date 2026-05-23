@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AuthResponse, PublicUser } from '@skak/shared';
+import type { AuthResponse, CheckoutRes, PublicUser } from '@skak/shared';
 import { apiGet, apiPost } from './api.js';
 
 const TOKEN_KEY = 'skak.token';
@@ -65,5 +65,40 @@ export function useAuth() {
     setUser(null);
   }, [store]);
 
-  return { token, user, login, signup, logout, refresh };
+  const setTheme = useCallback(
+    async (theme: string | null): Promise<{ ok: boolean; error?: string }> => {
+      if (!token) return { ok: false, error: 'Sign in first.' };
+      const res = await apiPost<{ ok: boolean; user?: PublicUser; error?: string }>(
+        '/api/me/theme',
+        { theme },
+        token,
+      );
+      if (res.ok && res.user) setUser(res.user);
+      return { ok: res.ok, error: res.error };
+    },
+    [token],
+  );
+
+  /** Open Stripe Checkout in the current tab. Returns {ok:false,error} if it can't. */
+  const startCheckout = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!token) return { ok: false, error: 'Sign in first.' };
+    const res = await apiPost<CheckoutRes>('/api/billing/checkout', {}, token);
+    if (res.ok && res.url) {
+      window.location.href = res.url;
+      return { ok: true };
+    }
+    return { ok: false, error: res.error };
+  }, [token]);
+
+  const openPortal = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!token) return { ok: false, error: 'Sign in first.' };
+    const res = await apiPost<CheckoutRes>('/api/billing/portal', {}, token);
+    if (res.ok && res.url) {
+      window.location.href = res.url;
+      return { ok: true };
+    }
+    return { ok: false, error: res.error };
+  }, [token]);
+
+  return { token, user, login, signup, logout, refresh, setTheme, startCheckout, openPortal };
 }

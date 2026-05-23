@@ -20,6 +20,7 @@ export interface Account {
   username: string;
   rating: number;
   country: string | null;
+  pro: boolean;
 }
 
 interface Player {
@@ -32,6 +33,7 @@ interface Player {
   userId: number | null;
   rating: number | null;
   country: string | null;
+  pro: boolean;
 }
 
 export interface Room {
@@ -361,6 +363,7 @@ export class RoomManager {
       isHost: p.id === room.hostId,
       rating: p.rating,
       country: p.country,
+      pro: p.pro,
     }));
     return { id: room.id, mode: room.mode, status: room.status, capacity: room.capacity, players };
   }
@@ -376,6 +379,7 @@ export class RoomManager {
       userId: account?.userId ?? null,
       rating: account?.rating ?? null,
       country: account?.country ?? null,
+      pro: account?.pro ?? false,
     };
   }
 

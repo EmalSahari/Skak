@@ -21,6 +21,7 @@ import { useLocalGame } from './useLocalGame.js';
 import { useAuth } from './useAuth.js';
 import { flagEmoji } from './lib/countries.js';
 import { Button } from './components/ui/Button.js';
+import { ProBadge } from './components/ProBadge.js';
 import { cn } from './lib/cn.js';
 
 interface Session {
@@ -57,6 +58,20 @@ export function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [searching, setSearching] = useState<GameMode | null>(null);
   const [matchStatus, setMatchStatus] = useState<MatchStatus | null>(null);
+
+  // After Stripe Checkout returns to /?upgrade=success, refresh the user a
+  // couple of times so the new Pro status surfaces even if the webhook is
+  // slightly delayed.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgrade') === 'success') {
+      auth.refresh();
+      const t = setTimeout(() => auth.refresh(), 2500);
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const saveSession = useCallback((s: Session | null) => {
     setSession(s);
@@ -263,6 +278,7 @@ export function App() {
               >
                 <span>{flagEmoji(auth.user.country)}</span>
                 <span className="font-semibold">{auth.user.username}</span>
+                {auth.user.pro && <ProBadge />}
                 <span className="font-mono text-brand-300">{auth.user.elo}</span>
               </button>
               <button
@@ -324,6 +340,7 @@ export function App() {
           onLeave={local.leave}
           onResign={local.resign}
           onRematch={local.rematch}
+          boardTheme={auth.user?.boardTheme}
           local
         />
       ) : inRoom ? (
@@ -339,6 +356,7 @@ export function App() {
           onDrawOffer={offerDraw}
           onDrawRespond={respondDraw}
           onRematch={requestRematch}
+          boardTheme={auth.user?.boardTheme}
         />
       ) : (
         <Lobby
@@ -364,7 +382,13 @@ export function App() {
         )}
         {showBoard && <Leaderboard onClose={() => setShowBoard(false)} />}
         {showProfile && auth.user && (
-          <ProfileModal user={auth.user} onClose={() => setShowProfile(false)} />
+          <ProfileModal
+            user={auth.user}
+            onClose={() => setShowProfile(false)}
+            onUpgrade={auth.startCheckout}
+            onManage={auth.openPortal}
+            onTheme={auth.setTheme}
+          />
         )}
       </AnimatePresence>
     </div>

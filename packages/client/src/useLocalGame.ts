@@ -150,7 +150,16 @@ export function useLocalGame() {
     let cpuCount = 0;
     const players: PlayerInfo[] = colors.map((c) => {
       if (c === cfg.human) {
-        return { id: 'you', name: cfg.name, color: c, connected: true, isHost: true, rating: null, country: null };
+        return {
+          id: 'you',
+          name: cfg.name,
+          color: c,
+          connected: true,
+          isHost: true,
+          rating: null,
+          country: null,
+          pro: false,
+        };
       }
       cpuCount += 1;
       return {
@@ -161,6 +170,7 @@ export function useLocalGame() {
         isHost: false,
         rating: null,
         country: null,
+        pro: false,
       };
     });
 

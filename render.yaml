@@ -18,3 +18,16 @@ services:
       # without accounts. Configured in the Render dashboard, not in git.
       - key: DATABASE_URL
         sync: false
+      # OpenAI key — enables the post-game AI coach. Leave unset to hide it.
+      - key: OPENAI_API_KEY
+        sync: false
+      # Stripe — enables Skak Pro subscriptions. Leave unset to disable upgrades.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Public URL of this app (used for Stripe Checkout return URLs).
+      - key: APP_URL
+        sync: false

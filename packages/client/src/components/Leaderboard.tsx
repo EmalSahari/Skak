@@ -4,6 +4,7 @@ import { Trophy, X } from 'lucide-react';
 import type { Leaderboard as LeaderboardData } from '@skak/shared';
 import { apiGet } from '../api.js';
 import { flagEmoji } from '../lib/countries.js';
+import { ProBadge } from './ProBadge.js';
 import { cn } from '../lib/cn.js';
 
 export function Leaderboard({ onClose }: { onClose: () => void }) {
@@ -73,7 +74,10 @@ export function Leaderboard({ onClose }: { onClose: () => void }) {
                   {i + 1}
                 </span>
                 <span className="text-lg">{flagEmoji(row.country)}</span>
-                <span className="flex-1 truncate font-medium">{row.username}</span>
+                <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span className="truncate font-medium">{row.username}</span>
+                  {row.pro && <ProBadge />}
+                </span>
                 {'elo' in row ? (
                   <span className="font-mono font-semibold text-brand-300">{row.elo}</span>
                 ) : (

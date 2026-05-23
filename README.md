@@ -24,6 +24,8 @@ classic 2-player chess or free-for-all games with 3 or 4 armies.
   the same mode, with a live estimated wait.
 - **AI coach** (optional) — a post-game "Review game" button asks an LLM for a
   short, friendly review of the game. Requires `OPENAI_API_KEY` on the server.
+  Free accounts get 2 reviews per day; **Skak Pro** ($5/month via Stripe) gets
+  unlimited reviews, custom board themes, and a PRO badge on the leaderboard.
 - **Real-time rooms** over WebSockets (Socket.IO) with auto-start when full,
   reconnect-on-refresh, a player list, turn/check indicators, and room chat.
 
@@ -63,8 +65,12 @@ set these environment variables on the server:
 | -------------- | -------------------------------------------------------------- |
 | `DATABASE_URL` | Postgres connection string (e.g. a free [Neon](https://neon.tech) database). The schema is created automatically on boot. |
 | `AUTH_SECRET`  | Secret used to sign auth tokens. Set a long random value.      |
-| `OPENAI_API_KEY` | (Optional) Enables the post-game "AI coach" review. Without it, the Review button is hidden. The key is only ever used server-side. |
+| `OPENAI_API_KEY` | (Optional) Enables the post-game "AI coach" review. The key is only ever used server-side. |
 | `OPENAI_MODEL` | (Optional) Model for reviews; defaults to `gpt-4o-mini`.        |
+| `STRIPE_SECRET_KEY` | (Optional) Enables **Skak Pro** subscriptions via Stripe. |
+| `STRIPE_PRICE_ID` | The Stripe Price ID for the $5/month plan.                 |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret. Point Stripe to `/api/billing/webhook`. |
+| `APP_URL` | Public base URL of this server (e.g. `https://skak.onrender.com`) — used as the success/cancel return URL for Stripe Checkout. |
 
 Passwords are stored hashed (scrypt); only username, optional email, and a
 two-letter country code are kept.

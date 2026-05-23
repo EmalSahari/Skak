@@ -7,6 +7,7 @@ import { Board } from './Board.js';
 import { Clock } from './Clock.js';
 import { ReviewModal } from './ReviewModal.js';
 import { Button } from './ui/Button.js';
+import { ProBadge } from './ProBadge.js';
 import { buildTranscript, moveLabel } from '../lib/format.js';
 import { flagEmoji } from '../lib/countries.js';
 import { cn } from '../lib/cn.js';
@@ -24,6 +25,7 @@ interface Props {
   onDrawOffer?: () => void;
   onDrawRespond?: (accept: boolean) => void;
   local?: boolean;
+  boardTheme?: string | null;
 }
 
 export function GameRoom({
@@ -39,6 +41,7 @@ export function GameRoom({
   onDrawOffer,
   onDrawRespond,
   local = false,
+  boardTheme = null,
 }: Props) {
   const { room, snapshot, clock, drawOffer } = sync;
   const me = room.players.find((p) => p.id === playerId);
@@ -155,9 +158,12 @@ export function GameRoom({
                   style={{ background: p.color ? COLOR_HEX[p.color] : '#71717a' }}
                 />
                 {p.country && <span title={p.country}>{flagEmoji(p.country)}</span>}
-                <span className="flex-1 truncate">
-                  {p.name}
-                  {p.rating != null && <span className="ml-1 font-mono text-[11px] text-zinc-500">{p.rating}</span>}
+                <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span className="truncate">{p.name}</span>
+                  {p.pro && <ProBadge />}
+                  {p.rating != null && (
+                    <span className="font-mono text-[11px] text-zinc-500">{p.rating}</span>
+                  )}
                   {p.id === playerId && <span className="text-zinc-500"> (you)</span>}
                 </span>
                 {p.isHost && <Crown className="h-3.5 w-3.5 text-amber-400" />}
@@ -323,7 +329,7 @@ export function GameRoom({
             animate={{ opacity: 1, scale: 1 }}
             className="relative rounded-2xl border border-white/10 bg-black/20 p-2 shadow-2xl sm:p-3"
           >
-            <Board snapshot={snapshot} myColor={myColor} onMove={onMove} />
+            <Board snapshot={snapshot} myColor={myColor} onMove={onMove} theme={boardTheme} />
             <AnimatePresence>
               {over && (
                 <motion.div

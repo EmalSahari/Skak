@@ -9,6 +9,7 @@ export interface PlayerInfo {
   isHost: boolean;
   rating: number | null;
   country: string | null;
+  pro: boolean;
 }
 
 /** A registered account, as exposed to clients (no password/email). */
@@ -24,6 +25,8 @@ export interface PublicUser {
   won3: number;
   played4: number;
   won4: number;
+  pro: boolean;
+  boardTheme: string | null;
 }
 
 export interface AuthResponse {
@@ -38,6 +41,7 @@ export interface EloEntry {
   country: string | null;
   elo: number;
   games: number;
+  pro: boolean;
 }
 
 export interface WinsEntry {
@@ -45,6 +49,7 @@ export interface WinsEntry {
   country: string | null;
   wins: number;
   games: number;
+  pro: boolean;
 }
 
 export interface Leaderboard {
@@ -70,7 +75,22 @@ export interface ServerCaps {
   ok: boolean;
   accounts: boolean;
   coach: boolean;
+  billing: boolean;
 }
+
+export interface CheckoutRes {
+  ok: boolean;
+  error?: string;
+  url?: string;
+}
+
+export interface ThemeReq {
+  theme: string;
+}
+
+export const FREE_REVIEWS_PER_DAY = 2;
+export const BOARD_THEMES = ['classic', 'midnight', 'forest', 'sunset', 'mono'] as const;
+export type BoardTheme = (typeof BOARD_THEMES)[number];
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
