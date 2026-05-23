@@ -24,7 +24,6 @@ interface Props {
   onDrawOffer?: () => void;
   onDrawRespond?: (accept: boolean) => void;
   local?: boolean;
-  coachEnabled?: boolean;
 }
 
 export function GameRoom({
@@ -40,7 +39,6 @@ export function GameRoom({
   onDrawOffer,
   onDrawRespond,
   local = false,
-  coachEnabled = false,
 }: Props) {
   const { room, snapshot, clock, drawOffer } = sync;
   const me = room.players.find((p) => p.id === playerId);
@@ -348,7 +346,7 @@ export function GameRoom({
                         Lobby
                       </Button>
                     </div>
-                    {coachEnabled && snapshot.history.length > 1 && (
+                    {snapshot.history.length > 1 && (
                       <button
                         onClick={() => setShowReview(true)}
                         className="mt-3 inline-flex items-center gap-1.5 text-sm text-brand-300 hover:underline"
